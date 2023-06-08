@@ -45,7 +45,15 @@
 
 /* Private variables ---------------------------------------------------------*/
  UART_HandleTypeDef huart2;
-
+/*
+COUNT = 0
+QCAVSx = 700c48f77f56584c5cc632ca65640db91b6bacce3a4df6b42ce7cc838833d287 - Remote_Public_Key
+QCAVSy = db71e509e3fd9b060ddb20ba5c51dcc5948d46fbf640dfe0441782cab85fa4ac - Remote_Public_Key
+dIUT = 7d7dc5f71eb29ddaf80d6214632eeae03d9058af1fb6d22ed80badb62bc1a534 - Private_Key
+QIUTx = ead218590119e8876b29146ff89ca61770c4edbbf97d38ce385ed281d8a6b230
+QIUTy = 28af61281fd35e2fa7002523acc85a429cb06ee6648325389f59edfce1405141
+ZIUT = 46fc62106420ff012e54a434fbdd2d25ccc5852060561e68040dd7778997bd7b - Expected_SecretX
+ */
 /* USER CODE BEGIN PV */
  const uint8_t Private_Key[] =
  {
@@ -153,7 +161,6 @@ int main(void)
     {
       Error_Handler();
     }
-
     /* Cleanup context */
     cmox_ecc_cleanup(&Ecc_Ctx);
 
