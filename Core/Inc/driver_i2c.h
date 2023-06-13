@@ -13,15 +13,15 @@
 #include "stm32g431xx.h"
 
 typedef enum {
-  I2C__STATE_IDLE = 0,
-  I2C__STATE_START,
-  I2C__STATE_SEND_SLAVE_ADDR_WITH_WRITE,
-  I2C__STATE_SEND_SLAVE_ADDR_WITH_READ,
-  I2C__STATE_SEND_REGISTER_ADDR,
-  I2C__STATE_REPEATED_START_CONDITION,
-  I2C__STATE_RECEIVE_DATA,
-  I2C__STATE_STOP,
-  I2C__STATE_ERROR,
+    I2C__STATE_IDLE = 0,
+    I2C__STATE_START,
+    I2C__STATE_SEND_SLAVE_ADDR_WITH_WRITE,
+	I2C__STATE_SEND_SLAVE_ADDR_WITH_READ,
+	I2C__STATE_SEND_REGISTER_ADDR,
+	I2C__STATE_REPEATED_START_CONDITION,
+	I2C__STATE_RECEIVE_DATA,
+    I2C__STATE_STOP,
+	I2C__STATE_ERROR,
 } i2c_state_e;
 
 void i2c__initialize(void);
@@ -43,6 +43,10 @@ uint8_t i2c__read_slave_data_state_machine(i2c_state_e *i2c_state, uint8_t slave
  */
 void i2c__write_slave_data(uint8_t slave_address, uint8_t register_address, uint8_t data);
 
-void i2c__state_machine(i2c_state_e *i2c_state, uint8_t slave_address, uint8_t register_address, uint32_t bytes_to_read);
+void i2c__state_machine(uint8_t slave_address, uint8_t register_address, uint32_t bytes_to_read);
 
 void I2C1_EV_IRQHandler(void);
+
+
+/******************************* HAL Implementation ****************************************/
+void i2c__HAL_read_slave_data(uint8_t deviceAddress, uint8_t* data, uint16_t dataSize);
