@@ -125,7 +125,8 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  esp8266__initialize();
+  //esp8266__initialize();
+  uart__initialize(USART1, 115200);
   timer__initialize(DRIVER_TIMER2);
   uint16_t count = 0;
 
@@ -176,7 +177,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  esp8266__process();
+	 /* esp8266__process();
 	  if(timer__ms_elapsed(DRIVER_TIMER2))
 	  {
 		  if(++count == 1000)
@@ -184,7 +185,7 @@ int main(void)
 			  count = 0;
 			  esp8266__send_test_string();
 		  }
-	  }
+	  }*/
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

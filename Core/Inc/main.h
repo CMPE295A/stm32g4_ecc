@@ -71,6 +71,7 @@ void Error_Handler(void);
 #define T_SWO_GPIO_Port GPIOB
 #define LD2_Pin GPIO_PIN_8
 #define LD2_GPIO_Port GPIOB
+
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */
