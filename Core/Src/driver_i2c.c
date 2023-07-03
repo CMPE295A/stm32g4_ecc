@@ -28,6 +28,7 @@ i2c_state_e *i2c_state = I2C__STATE_IDLE;
  * 3. Replace busy loops with callback functions
  * 4. Add better error handling (bus timeout, arbitration lost, overrun)
  */
+/*
 void i2c__state_machine(i2c_state_e *i2c_state, uint8_t slave_address, uint8_t register_address, uint32_t bytes_to_read) {
 	if (slave_address > 127) {
 		I2C1->CR2 |= I2C_CR2_STOP;
@@ -241,5 +242,5 @@ void i2c__write_slave_data(uint8_t slave_address, uint8_t register_address, uint
     while((I2C1->ISR & I2C_ISR_STOPF) == 0); // Wait for STOP flag to be set
     I2C1->ICR |= I2C_ICR_STOPCF;             // Clear the STOP flag by writing 0 to it
 }
-
+*/
 
