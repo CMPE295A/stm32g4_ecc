@@ -88,6 +88,9 @@ Msg = 68656c6c6f207468697320697320636d7065323935 - Message - hello this is cmpe2
  uint8_t Computed_Secret[CMOX_ECC_SECP256R1_SECRET_LEN];
  uint8_t Computed_Hash[CMOX_SHA224_SIZE];
  uint8_t Computed_Signature[CMOX_ECC_SECP256R1_SIG_LEN];
+ uint8_t pubKey[CMOX_ECC_SECP256R1_PUBKEY_LEN];
+ uint8_t privateKey[CMOX_ECC_SECP256R1_PRIVKEY_LEN];
+
 
 /* USER CODE END PV */
  /* ECC context */
@@ -99,6 +102,8 @@ Msg = 68656c6c6f207468697320697320636d7065323935 - Message - hello this is cmpe2
  uint32_t Computed_Random[8];
  /* RNG peripheral handle */
  RNG_HandleTypeDef hrng;
+ RNG_HandleTypeDef hrng2;
+
 
  __IO TestStatus glob_status = FAILED;
 /* Private function prototypes -----------------------------------------------*/
@@ -107,6 +112,7 @@ static void MX_GPIO_Init(void);
 static void process_cli(void);
 static void MX_USART2_UART_Init(void);
 static void MX_RNG_Init(void);
+
 
 /**
   * @brief  The application entry point.
@@ -120,7 +126,14 @@ int main(void)
 	  size_t computed_size;
 	  size_t computed_size_ecdsa;
 	  cmox_hash_retval_t hretval;
+	  cmox_ecc_retval_t retval_keys;
+	  size_t privateKey_size;
+	  size_t pubKey_size;
 
+
+	  volatile uint32_t startTick = 0;
+	  volatile uint32_t endTick = 0;
+	  volatile uint32_t elapsedTime = 0;
 	  /* Fault check verification variable */
 	  uint32_t fault_check = CMOX_ECC_AUTH_FAIL;
 
@@ -137,7 +150,7 @@ int main(void)
 
   /* Configure the system clock */
   SystemClock_Config();
-
+  SysTick_Config(SystemCoreClock / 1000);
   /* USER CODE BEGIN SysInit */
 
   /* USER CODE END SysInit */
@@ -149,57 +162,39 @@ int main(void)
   timer__initialize(DRIVER_TIMER2);
   uint16_t count = 0;
 
-  __HAL_RCC_RNG_CLK_ENABLE();
-
-  hrng.Instance = RNG;
-  if (HAL_RNG_Init(&hrng) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-
-  /* USER CODE BEGIN 2 */
-  uint32_t randomNumber1;
-   if (HAL_RNG_GenerateRandomNumber(&hrng, &randomNumber1) != HAL_OK)
-   {
-     Error_Handler();
-   }
-
-   // Define the size of the private key
-   int size = 32;
-
-   // Create an array to store the hexadecimal values
-   uint8_t key[size];
-
-   // Convert the random number to hexadecimal and store it in key
-   toHex(randomNumber1, key, size);
-/*
-   // Print the key array
-   printf("const uint8_t Private_Key[] = {");
-   for (int i = 0; i < size; i++)
-   {
-     if (i != 0)
-     {
-       printf(", ");
-     }
-     printf("0x%02X", key[i]);
-   }
-   printf("};\n");
-*/
-  /* USER CODE END 2 */
   /* Initialize cryptographic library */
   if (cmox_initialize(NULL) != CMOX_INIT_SUCCESS)
   {
     Error_Handler();
   }
+  startTick = HAL_GetTick();
+  cmox_ecc_construct(&Ecc_Ctx, CMOX_ECC256_MATH_FUNCS, Working_Buffer, sizeof(Working_Buffer));
+
+  retval_keys=cmox_ecdsa_keyGen(&Ecc_Ctx,
+		  CMOX_ECC_CURVE_SECP256R1,
+		  Private_Key, sizeof(Private_Key),
+          privateKey, CMOX_ECC_SECP256R1_PRIVKEY_LEN,
+		  pubKey, CMOX_ECC_SECP256R1_PUBKEY_LEN);
+  endTick = HAL_GetTick();
+  elapsedTime = endTick - startTick;
+  /* Verify API returned value */
+    if (retval_keys != CMOX_ECC_SUCCESS)
+    {
+      Error_Handler();
+    }
+    /* Cleanup context */
+    cmox_ecc_cleanup(&Ecc_Ctx);
+
+   startTick = HAL_GetTick();
   cmox_ecc_construct(&Ecc_Ctx, CMOX_ECC256_MATH_FUNCS, Working_Buffer, sizeof(Working_Buffer));
   retval_ecc = cmox_ecdh(&Ecc_Ctx,                                         /* ECC context */
                        CMOX_ECC_CURVE_SECP256R1,                         /* SECP256R1 ECC curve selected */
-                       key, sizeof(key),                 /* Local Private key */
-                       Remote_Public_Key, sizeof(Remote_Public_Key),     /* Remote Public key */
+					   (uint8_t *)privateKey, sizeof(privateKey),                 /* Local Private key */
+					   (uint8_t *)pubKey, sizeof(pubKey),     /* Remote Public key */
                        Computed_Secret, &computed_size);                 /* Data buffer to receive shared secret */
 
-
+  endTick = HAL_GetTick();
+  elapsedTime = endTick - startTick;
   /* Verify API returned value */
     if (retval_ecc != CMOX_ECC_SUCCESS)
     {
@@ -476,15 +471,6 @@ int main(void)
   }
   /* USER CODE END 3 */
 }
-
-void toHex(uint32_t number, uint8_t* hexData, int size)
-{
-  for (int i = 0; i < size; i++)
-  {
-    hexData[i] = (number >> (8 * (size - i - 1))) & 0xFF;
-  }
-}
-
 
 /**
   * @brief System Clock Configuration
