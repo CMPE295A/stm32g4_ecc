@@ -172,7 +172,7 @@ int main(void)
 
   retval_keys=cmox_ecdsa_keyGen(&Ecc_Ctx,
 		  CMOX_ECC_CURVE_SECP256R1,
-		  Private_Key, sizeof(Private_Key),
+		  Known_Random, sizeof(Known_Random),
           privateKey, CMOX_ECC_SECP256R1_PRIVKEY_LEN,
 		  pubKey, CMOX_ECC_SECP256R1_PUBKEY_LEN);
   endTick = HAL_GetTick();
