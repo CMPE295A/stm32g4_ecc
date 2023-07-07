@@ -85,11 +85,15 @@ Msg = 68656c6c6f207468697320697320636d7065323935 - Message - hello this is cmpe2
  };
 
  /* Computed data buffer */
- uint8_t Computed_Secret[CMOX_ECC_SECP256R1_SECRET_LEN];
+ //uint8_t Computed_Secret[CMOX_ECC_SECP256R1_SECRET_LEN];
+ uint8_t Computed_Secret[CMOX_ECC_BPP512T1_SECRET_LEN];
+ uint8_t Computed_Signature[CMOX_ECC_BPP512T1_SIG_LEN];
+  uint8_t pubKey[CMOX_ECC_BPP512T1_PUBKEY_LEN];
+  uint8_t privateKey[CMOX_ECC_BPP512T1_PRIVKEY_LEN];
  uint8_t Computed_Hash[CMOX_SHA224_SIZE];
- uint8_t Computed_Signature[CMOX_ECC_SECP256R1_SIG_LEN];
- uint8_t pubKey[CMOX_ECC_SECP256R1_PUBKEY_LEN];
- uint8_t privateKey[CMOX_ECC_SECP256R1_PRIVKEY_LEN];
+ //uint8_t Computed_Signature[CMOX_ECC_SECP256R1_SIG_LEN];
+ //uint8_t pubKey[CMOX_ECC_SECP256R1_PUBKEY_LEN];
+ //uint8_t privateKey[CMOX_ECC_SECP256R1_PRIVKEY_LEN];
 
 
 /* USER CODE END PV */
@@ -100,6 +104,7 @@ Msg = 68656c6c6f207468697320697320636d7065323935 - Message - hello this is cmpe2
 
  /* Random data buffer */
  uint32_t Computed_Random[32];
+ uint32_t Computed_Random1[8];
  /* RNG peripheral handle */
  RNG_HandleTypeDef hrng;
 
@@ -182,10 +187,11 @@ int main(void)
     Error_Handler();
   }
   startTick = HAL_GetTick();
-  cmox_ecc_construct(&Ecc_Ctx, CMOX_ECC256_MATH_FUNCS, Working_Buffer, sizeof(Working_Buffer));
+  cmox_ecc_construct(&Ecc_Ctx, CMOX_ECC128MULT_MATH_FUNCS, Working_Buffer, sizeof(Working_Buffer));
 
   retval_keys=cmox_ecdsa_keyGen(&Ecc_Ctx,
-		  CMOX_ECC_SECP256R1_LOWMEM,
+		  //CMOX_ECC_SECP256R1_LOWMEM,
+		  CMOX_ECC_BPP512T1_LOWMEM,
 		  (uint8_t *)Computed_Random, sizeof(Computed_Random),
           privateKey, CMOX_ECC_SECP256R1_PRIVKEY_LEN,
 		  pubKey, CMOX_ECC_SECP256R1_PUBKEY_LEN);
@@ -200,9 +206,10 @@ int main(void)
     cmox_ecc_cleanup(&Ecc_Ctx);
 
    startTick = HAL_GetTick();
-  cmox_ecc_construct(&Ecc_Ctx, CMOX_ECC256_MATH_FUNCS, Working_Buffer, sizeof(Working_Buffer));
+  cmox_ecc_construct(&Ecc_Ctx, CMOX_ECC128MULT_MATH_FUNCS, Working_Buffer, sizeof(Working_Buffer));
   retval_ecc = cmox_ecdh(&Ecc_Ctx,                                         /* ECC context */
-		  CMOX_ECC_SECP256R1_LOWMEM,                         /* SECP256R1 ECC curve selected */
+						  CMOX_ECC_BPP512T1_LOWMEM,
+						  //CMOX_ECC_SECP256R1_LOWMEM,                         /* SECP256R1 ECC curve selected */
 					   (uint8_t *)privateKey, sizeof(privateKey),                 /* Local Private key */
 					   (uint8_t *)pubKey, sizeof(pubKey),     /* Remote Public key */
                        Computed_Secret, &computed_size);                 /* Data buffer to receive shared secret */
@@ -223,10 +230,12 @@ int main(void)
 
     /* Verify generated data are the expected ones -
      * compare first 32 bytes of Computed_Secret with Expected_Secret */
+    /*
     if (memcmp(Computed_Secret, Expected_SecretX, sizeof(Expected_SecretX)) != 0)
     {
       Error_Handler();
     }
+    */
     /* Cleanup context */
     cmox_ecc_cleanup(&Ecc_Ctx);
 
@@ -279,9 +288,10 @@ int main(void)
        * - CMOX_ECC_SECP256R1_HIGHMEM to select the high RAM usage definition (faster computing)
        */
       retval = cmox_ecdsa_sign(&Ecc_Ctx,                                 /* ECC context */
-                               CMOX_ECC_CURVE_SECP256R1,                 /* SECP256R1 ECC curve selected */
+    		  	  	  	  	  CMOX_ECC_BPP512T1_LOWMEM,
+    		  	  	  	  	  //CMOX_ECC_CURVE_SECP256R1,                 /* SECP256R1 ECC curve selected */
                                Known_Random, sizeof(Known_Random),       /* Random data buffer */
-                               Private_Key, sizeof(Private_Key),         /* Private key for signature */
+							   (uint8_t *)privateKey, sizeof(privateKey),         /* Private key for signature */
 							   Computed_Secret, &computed_size,
 							   //Computed_Hash, CMOX_SHA224_SIZE,          /* Digest to sign */
                                Computed_Signature, &computed_size_ecdsa);      /* Data buffer to receive signature */
@@ -293,11 +303,11 @@ int main(void)
       }
 
       /* Verify generated data size is the expected one */
-      if (computed_size_ecdsa != sizeof(Known_Signature))
+      /*if (computed_size_ecdsa != sizeof(Known_Signature))
       {
         Error_Handler();
       }
-
+*/
       /* Verify generated data are the expected ones */
       /*if (memcmp(Computed_Signature, Known_Signature, computed_size_ecdsa) != 0)
       {
@@ -324,10 +334,10 @@ int main(void)
        * - CMOX_ECC_SECP256R1_HIGHMEM to select the high RAM usage definition (faster computing)
        */
       retval = cmox_ecdsa_verify(&Ecc_Ctx,                                  /* ECC context */
-                                 CMOX_ECC_CURVE_SECP256R1,                  /* SECP256R1 ECC curve selected */
-                                 Remote_Public_Key, sizeof(Remote_Public_Key),            /* Public key for verification */
-								 Computed_Secret, &computed_size,
-								 //Computed_Hash, CMOX_SHA224_SIZE,           /* Digest to verify */
+    		  CMOX_ECC_SECP256R1_LOWMEM,                  /* SECP256R1 ECC curve selected */
+								 (uint8_t *)pubKey, sizeof(pubKey),            /* Public key for verification */
+								 //Computed_Secret, &computed_size,
+								 Computed_Hash, CMOX_SHA224_SIZE,           /* Digest to verify */
                                  Known_Signature, sizeof(Known_Signature),  /* Data buffer to receive signature */
                                  &fault_check);                             /* Fault check variable:
                                                                 to ensure no fault injection occurs during this API call */
@@ -377,9 +387,9 @@ int main(void)
       do
       {
         /* Generate random numbers */
-        for (uint32_t i = 0; i < sizeof(Computed_Random) / sizeof(uint32_t); i++)
+        for (uint32_t i = 0; i < sizeof(Computed_Random1) / sizeof(uint32_t); i++)
         {
-          if (HAL_RNG_GenerateRandomNumber(&hrng, &Computed_Random[i]) != HAL_OK)
+          if (HAL_RNG_GenerateRandomNumber(&hrng, &Computed_Random1[i]) != HAL_OK)
           {
             /* Random number generation error */
             Error_Handler();
@@ -394,11 +404,11 @@ int main(void)
          * - CMOX_ECC_SECP256R1_HIGHMEM to select the high RAM usage definition (faster computing)
          */
         retval = cmox_ecdsa_sign(&Ecc_Ctx,                                            /* ECC context */
-                                 CMOX_ECC_CURVE_SECP256R1,                            /* SECP256R1 ECC curve selected */
-                                 (uint8_t *)Computed_Random, sizeof(Computed_Random), /* Random data buffer */
-                                 Private_Key, sizeof(Private_Key),                    /* Private key for signature */
-								 Computed_Secret, &computed_size,
-								 //Computed_Hash, CMOX_SHA224_SIZE,                     /* Digest to sign */
+        		CMOX_ECC_SECP256R1_LOWMEM,                            /* SECP256R1 ECC curve selected */
+                                 (uint8_t *)Computed_Random1, sizeof(Computed_Random1), /* Random data buffer */
+								 (uint8_t *)privateKey, sizeof(privateKey),                    /* Private key for signature */
+								 //Computed_Secret, &computed_size,
+								 Computed_Hash, CMOX_SHA224_SIZE,                     /* Digest to sign */
                                  Computed_Signature, &computed_size_ecdsa);                 /* Data buffer to receive signature */
 
       } while (retval == CMOX_ECC_ERR_WRONG_RANDOM);
@@ -436,10 +446,10 @@ int main(void)
        * - CMOX_ECC_SECP256R1_HIGHMEM to select the high RAM usage definition (faster computing)
        */
       retval = cmox_ecdsa_verify(&Ecc_Ctx,                                        /* ECC context */
-                                 CMOX_ECC_CURVE_SECP256R1,                        /* SECP256R1 ECC curve selected */
-                                 Remote_Public_Key, sizeof(Remote_Public_Key),                  /* Public key for verification */
-								 Computed_Secret, &computed_size,
-								 //Computed_Hash, CMOX_SHA224_SIZE,                 /* Digest to verify */
+    		  CMOX_ECC_SECP256R1_LOWMEM,                        /* SECP256R1 ECC curve selected */
+								 (uint8_t *)pubKey, sizeof(pubKey),                  /* Public key for verification */
+								 //Computed_Secret, &computed_size,
+								 Computed_Hash, CMOX_SHA224_SIZE,                 /* Digest to verify */
                                  Computed_Signature, sizeof(Computed_Signature),  /* Data buffer to receive signature */
                                  &fault_check);                                   /* Fault check variable:
                                                                 to ensure no fault injection occurs during this API call */
