@@ -99,10 +99,9 @@ Msg = 68656c6c6f207468697320697320636d7065323935 - Message - hello this is cmpe2
  uint8_t Working_Buffer[2000];
 
  /* Random data buffer */
- uint32_t Computed_Random[8];
+ uint32_t Computed_Random[32];
  /* RNG peripheral handle */
  RNG_HandleTypeDef hrng;
- RNG_HandleTypeDef hrng2;
 
 
  __IO TestStatus glob_status = FAILED;
@@ -162,6 +161,21 @@ int main(void)
   timer__initialize(DRIVER_TIMER2);
   uint16_t count = 0;
 
+  hrng.Instance = RNG;
+  hrng.Init.ClockErrorDetection = RNG_CED_ENABLE;
+  if (HAL_RNG_Init(&hrng) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  for (uint32_t i = 0; i < sizeof(Computed_Random) / sizeof(uint32_t); i++)
+         {
+           if (HAL_RNG_GenerateRandomNumber(&hrng, &Computed_Random[i]) != HAL_OK)
+           {
+             /* Random number generation error */
+             Error_Handler();
+           }
+         }
+
   /* Initialize cryptographic library */
   if (cmox_initialize(NULL) != CMOX_INIT_SUCCESS)
   {
@@ -171,8 +185,8 @@ int main(void)
   cmox_ecc_construct(&Ecc_Ctx, CMOX_ECC256_MATH_FUNCS, Working_Buffer, sizeof(Working_Buffer));
 
   retval_keys=cmox_ecdsa_keyGen(&Ecc_Ctx,
-		  CMOX_ECC_CURVE_SECP256R1,
-		  Known_Random, sizeof(Known_Random),
+		  CMOX_ECC_SECP256R1_LOWMEM,
+		  (uint8_t *)Computed_Random, sizeof(Computed_Random),
           privateKey, CMOX_ECC_SECP256R1_PRIVKEY_LEN,
 		  pubKey, CMOX_ECC_SECP256R1_PUBKEY_LEN);
   endTick = HAL_GetTick();
@@ -188,7 +202,7 @@ int main(void)
    startTick = HAL_GetTick();
   cmox_ecc_construct(&Ecc_Ctx, CMOX_ECC256_MATH_FUNCS, Working_Buffer, sizeof(Working_Buffer));
   retval_ecc = cmox_ecdh(&Ecc_Ctx,                                         /* ECC context */
-                       CMOX_ECC_CURVE_SECP256R1,                         /* SECP256R1 ECC curve selected */
+		  CMOX_ECC_SECP256R1_LOWMEM,                         /* SECP256R1 ECC curve selected */
 					   (uint8_t *)privateKey, sizeof(privateKey),                 /* Local Private key */
 					   (uint8_t *)pubKey, sizeof(pubKey),     /* Remote Public key */
                        Computed_Secret, &computed_size);                 /* Data buffer to receive shared secret */
