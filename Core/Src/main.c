@@ -157,7 +157,6 @@ Msg = 68656c6c6f207468697320697320636d7065323935 - Message - hello this is cmpe2
 
 
  __IO TestStatus glob_status = FAILED;
-#define CHUNK_SIZE  48u   /* Chunk size (in bytes) when data to encrypt or decrypt are processed by chunk */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
@@ -282,39 +281,41 @@ int main(void)
     {
       Error_Handler();
     }
-    /* Cleanup context */
+    // Cleanup context
     cmox_ecc_cleanup(&Ecc_Ctx);
 
    startTick = HAL_GetTick();
   cmox_ecc_construct(&Ecc_Ctx, CMOX_ECC128MULT_MATH_FUNCS, Working_Buffer, sizeof(Working_Buffer));
   //generate shared secret using mcu's private key and remote public key
-  retval_ecc = cmox_ecdh(&Ecc_Ctx,                                         /* ECC context */
+  retval_ecc = cmox_ecdh(&Ecc_Ctx,                                         // ECC context
 						  CMOX_ECC_BPP512T1_LOWMEM,
-						  //CMOX_ECC_SECP256R1_LOWMEM,                         /* SECP256R1 ECC curve selected */
-					   (uint8_t *)privateKey, sizeof(privateKey),                 /* Local Private key */
-					   (uint8_t *)pubKey, sizeof(pubKey),     /* Remote Public key */
-                       Computed_Secret, &computed_size);                 /* Data buffer to receive shared secret */
+						  //CMOX_ECC_SECP256R1_LOWMEM,                         // SECP256R1 ECC curve selected
+					   (uint8_t *)privateKey, sizeof(privateKey),                 // Local Private key
+					   (uint8_t *)pubKey, sizeof(pubKey),     //Remote Public key
+                       Computed_Secret, &computed_size);      // Data buffer to receive shared secret
 
   endTick = HAL_GetTick();
   elapsedTime = endTick - startTick;
-  /* Verify API returned value */
+  // Verify API returned value */
     if (retval_ecc != CMOX_ECC_SUCCESS)
     {
       Error_Handler();
     }
 
-    /* Verify generated data size is the expected one */
+    // Verify generated data size is the expected one
     if (computed_size != sizeof(Computed_Secret))
     {
       Error_Handler();
     }
 
 
-    /* Cleanup context */
+    // Cleanup context
     cmox_ecc_cleanup(&Ecc_Ctx);
 
 
-    /*HKDF Function */
+    //HKDF Function - hmac key derivation function -
+    //computed_PRK - psuedorandom key generated using Computed_Secret
+    //computed_OKM - output keying material - can be considered as master key
 
     //Computed data buffer
      uint8_t computed_hash[CMOX_SHA256_SIZE];
@@ -326,7 +327,6 @@ int main(void)
      //size_t computed_size1;
      // General mac context
      cmox_mac_handle_t *mac_ctx;
-     uint32_t index1;
      uint32_t L = 128;
      uint32_t N = 0;
 
@@ -339,12 +339,9 @@ int main(void)
       */
      retval_hash = cmox_mac_compute(CMOX_HMAC_SHA256_ALGO,
 							 	 Computed_Secret, sizeof(Computed_Secret),
-								 //IKM, sizeof(IKM),
 								   salt, sizeof(salt),
 								   NULL, 0,
 								   computed_PRK,
-								   //Computed_Secret,
-								   //sizeof(Computed_Secret),
 								   CMOX_SHA256_SIZE,
 								   &computed_size);
 
@@ -370,7 +367,7 @@ int main(void)
      mac_ctx = cmox_hmac_construct(&Hmac_Ctx, CMOX_HMAC_SHA256);
      if (mac_ctx == NULL) Error_Handler();
 
-     index1 = 0;
+     index = 0;
      for (uint8_t i = 1; i <= N; i++)
      {
     	 retval_hash = cmox_mac_init(mac_ctx);
@@ -378,11 +375,10 @@ int main(void)
        // For the last iteration, tag length may be reduced to fit requested length L
        if (i == N)
        {
-    	   retval_hash = cmox_mac_setTagLen(mac_ctx, L - index1);
+    	   retval_hash = cmox_mac_setTagLen(mac_ctx, L - index);
        }
        if (retval_hash != CMOX_MAC_SUCCESS) Error_Handler();
        retval_hash = cmox_mac_setKey(mac_ctx, computed_PRK, sizeof(computed_PRK));
-       //retval_hash = cmox_mac_setKey(mac_ctx, Computed_Secret, sizeof(Computed_Secret));
 
        if (retval_hash != CMOX_MAC_SUCCESS) Error_Handler();
        if (i > 1)
@@ -398,20 +394,20 @@ int main(void)
        if (retval_hash != CMOX_MAC_SUCCESS) Error_Handler();
        if (i == N)
        {
-         memcpy(&computed_OKM[index1], computed_hash, L - index1);
-         index1 = L;
+         memcpy(&computed_OKM[index], computed_hash, L - index);
+         index = L;
        }
        else
        {
-         memcpy(&computed_OKM[index1], computed_hash, CMOX_SHA256_SIZE);
-         index1 += CMOX_SHA256_SIZE;
+         memcpy(&computed_OKM[index], computed_hash, CMOX_SHA256_SIZE);
+         index += CMOX_SHA256_SIZE;
        }
      }
      retval_hash = cmox_mac_cleanup(mac_ctx);
 
      if (retval_hash != CMOX_MAC_SUCCESS) Error_Handler();
 
-     	 	 // AES CBC ENCRYPTION
+     	 	 // AES CBC ENCRYPTION - using computed_OKM
 
              retval_cipher = cmox_cipher_encrypt(CMOX_AESFAST_CBC_ENC_ALGO,                  // Use AES EBC algorithm
                                           	  Plaintext, sizeof(Plaintext),           // Plaintext to encrypt
@@ -423,7 +419,7 @@ int main(void)
              {
                Error_Handler();
              }
-     	 	 // AES CBC DECRYPTION
+     	 	 // AES CBC DECRYPTION - using computed_OKM
              retval_cipher = cmox_cipher_decrypt(CMOX_AESFAST_CBC_DEC_ALGO,                 // Use AES EBC algorithm
                 							Computed_Ciphertext, sizeof(Computed_Ciphertext), // Ciphertext to decrypt
 											computed_OKM, CMOX_CIPHER_128_BIT_KEY,                      // AES key to use
@@ -434,7 +430,6 @@ int main(void)
                   {
                     Error_Handler();
                   }
-
                   // Verify generated data are the expected ones
                   if (memcmp(Plaintext, Computed_Plaintext, computed_size_encdec) != 0)
                   {
