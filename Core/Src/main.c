@@ -189,6 +189,7 @@ int main(void)
 	  cmox_cipher_handle_t *cipher_ctx;
 	  /* Index for piecemeal processing */
 	  uint32_t index;
+	  size_t computed_size_encdec;
 
 	  uint32_t startTick = 0;
 	  uint32_t endTick = 0;
@@ -245,37 +246,6 @@ int main(void)
   {
     Error_Handler();
   }
-  /*
-  startTick = HAL_GetTick();
-
-
-        retval_cipher = cmox_cipher_encrypt(CMOX_AESFAST_CBC_ENC_ALGO,                  // Use AES EBC algorithm
-                                     Plaintext, sizeof(Plaintext),           // Plaintext to encrypt
-  								   Private_Key, sizeof(Private_Key), // AES key to use
-                                     IV, sizeof(IV),                         // Initialization vector
-      								 (uint8_t *)Computed_Ciphertext, sizeof(Computed_Ciphertext)); // Data buffer to receive generated ciphertext
-        endTick = HAL_GetTick();
-        elapsedTime = endTick - startTick;
-        //Verify API returned value
-        if (retval_cipher != CMOX_CIPHER_SUCCESS)
-        {
-          Error_Handler();
-        }
-        startTick = HAL_GetTick();
-           retval_cipher = cmox_cipher_decrypt(CMOX_AESSMALL_CBC_DEC_ALGO,                 // Use AES EBC algorithm
-          		 (uint8_t *)Computed_Ciphertext, sizeof(Computed_Ciphertext), // Ciphertext to decrypt
-				 Private_Key, sizeof(Private_Key),                      // AES key to use
-                                          IV, sizeof(IV),                        // Initialization vector
-                                          (uint8_t *)Computed_Plaintext, sizeof(Computed_Plaintext));   // Data buffer to receive generated plaintext
-           endTick = HAL_GetTick();
-           elapsedTime = endTick - startTick;
-             //Verify API returned value
-             if (retval_cipher != CMOX_CIPHER_SUCCESS)
-             {
-               Error_Handler();
-             }
-*/
-
 /*
 //Generate random number to use Computed_Random in cmox_ecdsa_keyGen function
 
@@ -339,55 +309,22 @@ int main(void)
       Error_Handler();
     }
 
-    /* Verify generated data are the expected ones -
-     * compare first 32 bytes of Computed_Secret with Expected_Secret */
-    /*
-    if (memcmp(Computed_Secret, Expected_SecretX, sizeof(Expected_SecretX)) != 0)
-    {
-      Error_Handler();
-    }
-    */
+
     /* Cleanup context */
     cmox_ecc_cleanup(&Ecc_Ctx);
-    startTick = HAL_GetTick();
-                 retval_cipher = cmox_cipher_encrypt(CMOX_AESFAST_CBC_ENC_ALGO,                  // Use AES EBC algorithm
-                                              	  Plaintext, sizeof(Plaintext),           // Plaintext to encrypt
-    											  Computed_Secret, CMOX_CIPHER_128_BIT_KEY, // AES key to use
-    											  IV, sizeof(IV),                         // Initialization vector
-    											  (uint8_t *)Computed_Ciphertext, sizeof(Computed_Ciphertext)); // Data buffer to receive generated ciphertext
-                 endTick = HAL_GetTick();
-                 elapsedTime = endTick - startTick;
-                 //Verify API returned value
-                 if (retval_cipher != CMOX_CIPHER_SUCCESS)
-                 {
-                   Error_Handler();
-                 }
-                 startTick = HAL_GetTick();
-                    retval_cipher = cmox_cipher_decrypt(CMOX_AESFAST_CBC_DEC_ALGO,                 // Use AES EBC algorithm
-                    							Computed_Ciphertext, sizeof(Computed_Ciphertext), // Ciphertext to decrypt
-												Computed_Secret, CMOX_CIPHER_128_BIT_KEY,                      // AES key to use
-    											IV, sizeof(IV),                        // Initialization vector
-    											(uint8_t *)Computed_Plaintext, sizeof(Computed_Plaintext));   // Data buffer to receive generated plaintext
-                    endTick = HAL_GetTick();
-                    elapsedTime = endTick - startTick;
-                      //Verify API returned value
-                      if (retval_cipher != CMOX_CIPHER_SUCCESS)
-                      {
-                        Error_Handler();
-                      }
 
 
-    /*HKDF Function ignore the code/functions after this line*/
+    /*HKDF Function */
 
-    /* Computed data buffer */
+    //Computed data buffer
      uint8_t computed_hash[CMOX_SHA256_SIZE];
      uint8_t computed_PRK[CMOX_SHA256_SIZE];
-     uint8_t computed_OKM[128];  /* L    = 256 */
+     uint8_t computed_OKM[128];  // L    = 128
 
-     /* HMAC context handle */
+     // HMAC context handle
      cmox_hmac_handle_t Hmac_Ctx;
      //size_t computed_size1;
-     /* General mac context */
+     // General mac context
      cmox_mac_handle_t *mac_ctx;
      uint32_t index1;
      uint32_t L = 128;
@@ -411,7 +348,7 @@ int main(void)
 								   CMOX_SHA256_SIZE,
 								   &computed_size);
 
-     /* Verify API returned value */
+     // Verify API returned value
      if (retval_hash != CMOX_MAC_SUCCESS) Error_Handler();
 
      /*
@@ -438,7 +375,7 @@ int main(void)
      {
     	 retval_hash = cmox_mac_init(mac_ctx);
        if (retval_hash != CMOX_MAC_SUCCESS) Error_Handler();
-       /* For the last iteration, tag length may be reduced to fit requested length L */
+       // For the last iteration, tag length may be reduced to fit requested length L
        if (i == N)
        {
     	   retval_hash = cmox_mac_setTagLen(mac_ctx, L - index1);
@@ -471,273 +408,44 @@ int main(void)
        }
      }
      retval_hash = cmox_mac_cleanup(mac_ctx);
-     if (retval_hash != CMOX_MAC_SUCCESS) Error_Handler();
-// AES cbc encryption
 
-     	 	 startTick = HAL_GetTick();
+     if (retval_hash != CMOX_MAC_SUCCESS) Error_Handler();
+
+     	 	 // AES CBC ENCRYPTION
+
              retval_cipher = cmox_cipher_encrypt(CMOX_AESFAST_CBC_ENC_ALGO,                  // Use AES EBC algorithm
                                           	  Plaintext, sizeof(Plaintext),           // Plaintext to encrypt
-											  computed_OKM, sizeof(computed_OKM), // AES key to use
+											  computed_OKM, CMOX_CIPHER_128_BIT_KEY, // AES key to use
 											  IV, sizeof(IV),                         // Initialization vector
-											  (uint8_t *)Computed_Ciphertext, sizeof(Computed_Ciphertext)); // Data buffer to receive generated ciphertext
-             endTick = HAL_GetTick();
-             elapsedTime = endTick - startTick;
+											  (uint8_t *)Computed_Ciphertext, &computed_size_encdec); // Data buffer to receive generated ciphertext
              //Verify API returned value
              if (retval_cipher != CMOX_CIPHER_SUCCESS)
              {
                Error_Handler();
              }
-             startTick = HAL_GetTick();
-                retval_cipher = cmox_cipher_decrypt(CMOX_AESSMALL_CBC_DEC_ALGO,                 // Use AES EBC algorithm
-                							(uint8_t *)Computed_Ciphertext, sizeof(Computed_Ciphertext), // Ciphertext to decrypt
-											computed_OKM, sizeof(computed_OKM),                      // AES key to use
+     	 	 // AES CBC DECRYPTION
+             retval_cipher = cmox_cipher_decrypt(CMOX_AESFAST_CBC_DEC_ALGO,                 // Use AES EBC algorithm
+                							Computed_Ciphertext, sizeof(Computed_Ciphertext), // Ciphertext to decrypt
+											computed_OKM, CMOX_CIPHER_128_BIT_KEY,                      // AES key to use
 											IV, sizeof(IV),                        // Initialization vector
-											(uint8_t *)Computed_Plaintext, sizeof(Computed_Plaintext));   // Data buffer to receive generated plaintext
-                endTick = HAL_GetTick();
-                elapsedTime = endTick - startTick;
+											Computed_Plaintext, &computed_size_encdec);   // Data buffer to receive generated plaintext
                   //Verify API returned value
                   if (retval_cipher != CMOX_CIPHER_SUCCESS)
                   {
                     Error_Handler();
                   }
 
-
-    /* No more need of cryptographic services, finalize cryptographic library */
+                  // Verify generated data are the expected ones
+                  if (memcmp(Plaintext, Computed_Plaintext, computed_size_encdec) != 0)
+                  {
+                    Error_Handler();
+                  }
+    // No more need of cryptographic services, finalize cryptographic library
     if (cmox_finalize(NULL) != CMOX_INIT_SUCCESS)
     {
       Error_Handler();
     }
     glob_status = PASSED;
-
-
-    /* Compute directly the digest passing all the needed parameters */
-    hretval = cmox_hash_compute(CMOX_SHA224_ALGO,         /* Use SHA224 algorithm */
-                                Message, sizeof(Message), /* Message to digest */
-                                Computed_Hash,            /* Data buffer to receive digest data */
-                                CMOX_SHA224_SIZE,         /* Expected digest size */
-                                &computed_size_ecdsa);          /* Size of computed digest */
-
-    /* Verify API returned value */
-    if (hretval != CMOX_HASH_SUCCESS)
-    {
-      Error_Handler();
-    }
-
-    /* Verify generated data size is the expected one */
-    if (computed_size_ecdsa != CMOX_SHA224_SIZE)
-    {
-      Error_Handler();
-    }
-    /* --------------------------------------------------------------------------
-       * KNOWN RANDOM USAGE
-       * --------------------------------------------------------------------------
-       */
-
-      /* Construct a ECC context, specifying mathematics implementation and working buffer for later processing */
-      /* Note: CMOX_ECC256_MATH_FUNCS refer to the default mathematics implementation
-       * selected in cmox_default_config.h. To use a specific implementation, user can
-       * directly choose:
-       * - CMOX_MATH_FUNCS_SMALL to select the mathematics small implementation
-       * - CMOX_MATH_FUNCS_FAST to select the mathematics fast implementation
-       * - CMOX_MATH_FUNCS_SUPERFAST256 to select the mathematics fast implementation optimized for 256 bits computation
-       */
-      cmox_ecc_construct(&Ecc_Ctx, CMOX_ECC256_MATH_FUNCS, Working_Buffer, sizeof(Working_Buffer));
-
-      /* Compute directly the signature passing all the needed parameters */
-      /* Note: CMOX_ECC_CURVE_SECP256R1 refer to the default SECP256R1 definition
-       * selected in cmox_default_config.h. To use a specific definition, user can
-       * directly choose:
-       * - CMOX_ECC_SECP256R1_LOWMEM to select the low RAM usage definition (slower computing)
-       * - CMOX_ECC_SECP256R1_HIGHMEM to select the high RAM usage definition (faster computing)
-       */
-      retval = cmox_ecdsa_sign(&Ecc_Ctx,                                 /* ECC context */
-    		  	  	  	  	  CMOX_ECC_BPP512T1_LOWMEM,
-    		  	  	  	  	  //CMOX_ECC_CURVE_SECP256R1,                 /* SECP256R1 ECC curve selected */
-                               Known_Random, sizeof(Known_Random),       /* Random data buffer */
-							   (uint8_t *)privateKey, sizeof(privateKey),         /* Private key for signature */
-							   Computed_Secret, &computed_size,
-							   //Computed_Hash, CMOX_SHA224_SIZE,          /* Digest to sign */
-                               Computed_Signature, &computed_size_ecdsa);      /* Data buffer to receive signature */
-
-      /* Verify API returned value */
-      if (retval != CMOX_ECC_SUCCESS)
-      {
-        Error_Handler();
-      }
-
-      /* Verify generated data size is the expected one */
-      /*if (computed_size_ecdsa != sizeof(Known_Signature))
-      {
-        Error_Handler();
-      }
-*/
-      /* Verify generated data are the expected ones */
-      /*if (memcmp(Computed_Signature, Known_Signature, computed_size_ecdsa) != 0)
-      {
-        Error_Handler();
-      }*/
-
-      /* Cleanup context */
-      cmox_ecc_cleanup(&Ecc_Ctx);
-      /* Construct a ECC context, specifying mathematics implementation and working buffer for later processing */
-      /* Note: CMOX_ECC256_MATH_FUNCS refer to the default mathematics implementation
-       * selected in cmox_default_config.h. To use a specific implementation, user can
-       * directly choose:
-       * - CMOX_MATH_FUNCS_SMALL to select the mathematics small implementation
-       * - CMOX_MATH_FUNCS_FAST to select the mathematics fast implementation
-       * - CMOX_MATH_FUNCS_SUPERFAST256 to select the mathematics fast implementation optimized for 256 bits computation
-       */
-      cmox_ecc_construct(&Ecc_Ctx, CMOX_ECC256_MATH_FUNCS, Working_Buffer, sizeof(Working_Buffer));
-
-      /* Verify directly the signature passing all the needed parameters */
-      /* Note: CMOX_ECC_CURVE_SECP256R1 refer to the default SECP256R1 definition
-       * selected in cmox_default_config.h. To use a specific definition, user can
-       * directly choose:
-       * - CMOX_ECC_SECP256R1_LOWMEM to select the low RAM usage definition (slower computing)
-       * - CMOX_ECC_SECP256R1_HIGHMEM to select the high RAM usage definition (faster computing)
-       */
-      retval = cmox_ecdsa_verify(&Ecc_Ctx,                                  /* ECC context */
-    		  CMOX_ECC_SECP256R1_LOWMEM,                  /* SECP256R1 ECC curve selected */
-								 (uint8_t *)pubKey, sizeof(pubKey),            /* Public key for verification */
-								 //Computed_Secret, &computed_size,
-								 Computed_Hash, CMOX_SHA224_SIZE,           /* Digest to verify */
-                                 Known_Signature, sizeof(Known_Signature),  /* Data buffer to receive signature */
-                                 &fault_check);                             /* Fault check variable:
-                                                                to ensure no fault injection occurs during this API call */
-
-      /* Verify API returned value */
-      if (retval != CMOX_ECC_AUTH_SUCCESS)
-      {
-        Error_Handler();
-      }
-      /* Verify Fault check variable value */
-      if (fault_check != CMOX_ECC_AUTH_SUCCESS)
-      {
-        Error_Handler();
-      }
-
-      /* Cleanup context */
-      cmox_ecc_cleanup(&Ecc_Ctx);
-
-      /* --------------------------------------------------------------------------
-       * TRUE RANDOM USAGE
-       * --------------------------------------------------------------------------
-       */
-
-      /* Configure RNG peripheral */
-      hrng.Instance = RNG;
-      hrng.Init.ClockErrorDetection = RNG_CED_ENABLE;
-      if (HAL_RNG_Init(&hrng) != HAL_OK)
-      {
-        Error_Handler();
-      }
-
-      /* Construct a ECC context, specifying mathematics implementation and working buffer for later processing */
-      /* Note: CMOX_ECC256_MATH_FUNCS refer to the default mathematics implementation
-       * selected in cmox_default_config.h. To use a specific implementation, user can
-       * directly choose:
-       * - CMOX_MATH_FUNCS_SMALL to select the mathematics small implementation
-       * - CMOX_MATH_FUNCS_FAST to select the mathematics fast implementation
-       * - CMOX_MATH_FUNCS_SUPERFAST256 to select the mathematics fast implementation optimized for 256 bits computation
-       */
-      cmox_ecc_construct(&Ecc_Ctx, CMOX_ECC256_MATH_FUNCS, Working_Buffer, sizeof(Working_Buffer));
-
-      /* Note: The random value must satisfy some arithmetic constraints versus the selected curve and points
-       * to minimize the statictical vulnerability.
-       * In case this is not satisfied, cmox_ecdsa_sign returns CMOX_ECC_ERR_WRONG_RANDOM: new random has to be
-       * generated and API call again.
-       */
-      do
-      {
-        /* Generate random numbers */
-        for (uint32_t i = 0; i < sizeof(Computed_Random) / sizeof(uint32_t); i++)
-        {
-          if (HAL_RNG_GenerateRandomNumber(&hrng, &Computed_Random[i]) != HAL_OK)
-          {
-            /* Random number generation error */
-            Error_Handler();
-          }
-        }
-
-        /* Compute directly the signature passing all the needed parameters */
-        /* Note: CMOX_ECC_CURVE_SECP256R1 refer to the default SECP256R1 definition
-         * selected in cmox_default_config.h. To use a specific definition, user can
-         * directly choose:
-         * - CMOX_ECC_SECP256R1_LOWMEM to select the low RAM usage definition (slower computing)
-         * - CMOX_ECC_SECP256R1_HIGHMEM to select the high RAM usage definition (faster computing)
-         */
-        retval = cmox_ecdsa_sign(&Ecc_Ctx,                                            /* ECC context */
-        		CMOX_ECC_SECP256R1_LOWMEM,                            /* SECP256R1 ECC curve selected */
-                                 (uint8_t *)Computed_Random, sizeof(Computed_Random), /* Random data buffer */
-								 (uint8_t *)privateKey, sizeof(privateKey),                    /* Private key for signature */
-								 //Computed_Secret, &computed_size,
-								 Computed_Hash, CMOX_SHA224_SIZE,                     /* Digest to sign */
-                                 Computed_Signature, &computed_size_ecdsa);                 /* Data buffer to receive signature */
-
-      } while (retval == CMOX_ECC_ERR_WRONG_RANDOM);
-
-      /* Verify API returned value */
-      if (retval != CMOX_ECC_SUCCESS)
-      {
-        Error_Handler();
-      }
-
-      /* Verify generated data size is the expected one */
-      if (computed_size_ecdsa != sizeof(Known_Signature))
-      {
-        Error_Handler();
-      }
-
-      /* Cleanup context */
-      cmox_ecc_cleanup(&Ecc_Ctx);
-
-      /* Construct a ECC context, specifying mathematics implementation and working buffer for later processing */
-      /* Note: CMOX_ECC256_MATH_FUNCS refer to the default mathematics implementation
-       * selected in cmox_default_config.h. To use a specific implementation, user can
-       * directly choose:
-       * - CMOX_MATH_FUNCS_SMALL to select the mathematics small implementation
-       * - CMOX_MATH_FUNCS_FAST to select the mathematics fast implementation
-       * - CMOX_MATH_FUNCS_SUPERFAST256 to select the mathematics fast implementation optimized for 256 bits computation
-       */
-      cmox_ecc_construct(&Ecc_Ctx, CMOX_ECC256_MATH_FUNCS, Working_Buffer, sizeof(Working_Buffer));
-
-      /* Verify directly the signature passing all the needed parameters */
-      /* Note: CMOX_ECC_CURVE_SECP256R1 refer to the default SECP256R1 definition
-       * selected in cmox_default_config.h. To use a specific definition, user can
-       * directly choose:
-       * - CMOX_ECC_SECP256R1_LOWMEM to select the low RAM usage definition (slower computing)
-       * - CMOX_ECC_SECP256R1_HIGHMEM to select the high RAM usage definition (faster computing)
-       */
-      retval = cmox_ecdsa_verify(&Ecc_Ctx,                                        /* ECC context */
-    		  CMOX_ECC_SECP256R1_LOWMEM,                        /* SECP256R1 ECC curve selected */
-								 (uint8_t *)pubKey, sizeof(pubKey),                  /* Public key for verification */
-								 //Computed_Secret, &computed_size,
-								 Computed_Hash, CMOX_SHA224_SIZE,                 /* Digest to verify */
-                                 Computed_Signature, sizeof(Computed_Signature),  /* Data buffer to receive signature */
-                                 &fault_check);                                   /* Fault check variable:
-                                                                to ensure no fault injection occurs during this API call */
-
-      /* Verify API returned value */
-      if (retval != CMOX_ECC_AUTH_SUCCESS)
-      {
-        Error_Handler();
-      }
-      /* Verify Fault check variable value */
-      if (fault_check != CMOX_ECC_AUTH_SUCCESS)
-      {
-        Error_Handler();
-      }
-
-      /* Cleanup context */
-      cmox_ecc_cleanup(&Ecc_Ctx);
-
-
-      /* No more need of cryptographic services, finalize cryptographic library */
-      if (cmox_finalize(NULL) != CMOX_INIT_SUCCESS)
-      {
-        Error_Handler();
-      }
-      glob_status = PASSED;
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
