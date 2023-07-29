@@ -21,7 +21,7 @@
 #include "driver_uart.h"
 #include "driver_timer.h"
 #include "cmox_crypto.h"
-#include "interface_esp8266.h"
+#include "interface_at_command.h"
 #include <string.h>
 
 /* Private variables ---------------------------------------------------------*/
@@ -64,7 +64,7 @@ server's public key: 0486690d59b5dcd031dd9bdc7addd9cc2de0ace5970c37bd751394bd0c7
  {
    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f};
 
- const uint8_t Plaintext[] =
+uint8_t Plaintext[] =
  {
    0x6b, 0xc1, 0xbe, 0xe2, 0x2e, 0x40, 0x9f, 0x96, 0xe9, 0x3d, 0x7e, 0x11, 0x73, 0x93, 0x17, 0x2a,
    0xae, 0x2d, 0x8a, 0x57, 0x1e, 0x03, 0xac, 0x9c, 0x9e, 0xb7, 0x6f, 0xac, 0x45, 0xaf, 0x8e, 0x51,
@@ -132,7 +132,6 @@ server's public key: 0486690d59b5dcd031dd9bdc7addd9cc2de0ace5970c37bd751394bd0c7
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void process_cli(void);
-static void MX_USART2_UART_Init(void);
 static void MX_RNG_Init(void);
 
 
@@ -140,6 +139,19 @@ static void MX_RNG_Init(void);
   * @brief  The application entry point.
   * @retval int
   */
+
+void wait_ms(int ms_wait_threshold)
+{
+	  uint16_t modem_reset_count = 0;
+	  while(modem_reset_count < ms_wait_threshold)
+	  {
+		  if(timer__ms_elapsed(DRIVER_TIMER2))
+		  {
+			  modem_reset_count++;
+		  }
+	  }
+}
+
 int main(void)
 {
 	  cmox_ecc_retval_t retval_ecc; //return value for cmox_ecdh
@@ -179,10 +191,9 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  esp8266__initialize();
-  uart__initialize(USART1, 115200);
+
   timer__initialize(DRIVER_TIMER2);
-  uint16_t count = 0;
+  //uint16_t count = 0;
 
   hrng.Instance = RNG;
   hrng.Init.ClockErrorDetection = RNG_CED_ENABLE;
@@ -196,7 +207,10 @@ int main(void)
   {
     Error_Handler();
   }
-
+  wait_ms(1000);
+  HAL_GPIO_WritePin(WIFI_MODEM_RESET_PORT, WIFI_MODEM_RESET_PIN, GPIO_PIN_SET);
+  wait_ms(1000);
+  at_interface__initialize();
 /*
  //Uncomment to use random number in cmox_ecdsa_keyGen
 /
@@ -442,23 +456,24 @@ int main(void)
                   */
 
 
-  /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
-  while (1)
-  {
-	 /* esp8266__process();
-	  if(timer__ms_elapsed(DRIVER_TIMER2))
-	  {
-		  if(++count == 1000)
-		  {
-			  count = 0;
-			  esp8266__send_test_string();
-		  }
-	  }*/
-    /* USER CODE END WHILE */
+        /* Infinite loop */
+        /* USER CODE BEGIN WHILE */
+        int count = 0;
+        while (1)
+        {
+      	  at_interface__process();
+      	  if(timer__ms_elapsed(DRIVER_TIMER2))
+      	  {
+      		  if(++count == 1000)
+      		  {
+      			  count = 0;
+      			  at_interface__send_test_string();
+      		  }
+      	  }
+          /* USER CODE END WHILE */
 
-    /* USER CODE BEGIN 3 */
-  }
+          /* USER CODE BEGIN 3 */
+        }
   /* USER CODE END 3 */
 }
 
@@ -530,6 +545,16 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(WIFI_MODEM_RESET_PORT, WIFI_MODEM_RESET_PIN, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : A2 Wiznet360 reset */
+  GPIO_InitStruct.Pin = WIFI_MODEM_RESET_PIN;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(WIFI_MODEM_RESET_PORT, &GPIO_InitStruct);
 
   //  // USART1_TX (A9)
   GPIOA->MODER &= ~(3 << 18);
