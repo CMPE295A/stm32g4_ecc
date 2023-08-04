@@ -79,7 +79,7 @@ void sensor__get_accel(void)
 	lateral = accel_z_raw/16384.0;
 
 	char buf[64];
-	//sprintf(buf, "horizontal: %.2f, vertical: %.2f, lateral: %.2f\r\n", horizontal, vertical, lateral);
+	sprintf(buf, "horizontal: %.2f, vertical: %.2f, lateral: %.2f\r\n", horizontal, vertical, lateral);
 	HAL_UART_Transmit(&huart1, (uint8_t*)buf, strlen(buf), HAL_MAX_DELAY);
 }
 
@@ -102,7 +102,7 @@ void sensor__get_gyro(void)
 	yaw = gyro_z_raw/131.0;
 
 	char buf[64];
-	//sprintf(buf, "roll: %.2f, pitch: %.2f, yaw: %.2f\r\n\n", roll, pitch, yaw);
+	sprintf(buf, "roll: %.2f, pitch: %.2f, yaw: %.2f\r\n\n", roll, pitch, yaw);
 	HAL_UART_Transmit(&huart1, (uint8_t*)buf, strlen(buf), HAL_MAX_DELAY);
 }
 
