@@ -3,12 +3,11 @@
 #include "stm32g4xx_hal.h"
 
 static const uint32_t TIMER_CLOCK_HZ = 170000000;
-static const uint32_t TIMER_MS_PER_SECOND = 1000;
 
 typedef struct
 {
 	TIM_TypeDef *regs;
-	volatile uint32_t ms_count;
+	volatile uint32_t tick_count;
 	volatile uint32_t last_ms_count;
 }timer_t;
 
@@ -19,7 +18,7 @@ timer_t timer[NUM_TIMER_DRIVERS] =
 		{.regs = TIM4},
 };
 
-bool timer__initialize(uint8_t id)
+bool timer__initialize(uint8_t id, uint32_t divisor)
 {
 	bool initialized = false;
 	switch(id)
@@ -33,6 +32,7 @@ bool timer__initialize(uint8_t id)
 	case DRIVER_TIMER3:
 		RCC->APB1ENR1 |= RCC_APB1ENR1_TIM3EN;
 		NVIC->ISER[(TIM3_IRQn / 32)] |= (1 << (TIM3_IRQn % 32));
+		NVIC->IP[TIM2_IRQn] |= 0x10;
 		break;
 
 	case DRIVER_TIMER4:
@@ -46,9 +46,9 @@ bool timer__initialize(uint8_t id)
 
 	if(id < NUM_TIMER_DRIVERS)
 	{
-		timer[id].ms_count = 0;
+		timer[id].tick_count = 0;
 		timer[id].last_ms_count = 0;
-		uint32_t divisor_ms = TIMER_CLOCK_HZ / TIMER_MS_PER_SECOND;
+		uint32_t divisor_ms = TIMER_CLOCK_HZ / divisor;
 
 		// configure for
 		timer[id].regs->CR1 |= TIM_CR1_URS;
@@ -66,28 +66,28 @@ bool timer__ms_elapsed(uint8_t id)
 	bool elapsed = false;
 	if(id < NUM_TIMER_DRIVERS)
 	{
-		elapsed = timer[id].ms_count != timer[id].last_ms_count;
+		elapsed = timer[id].tick_count != timer[id].last_ms_count;
 		if(elapsed)
 		{
-			timer[id].last_ms_count = timer[id].ms_count;
+			timer[id].last_ms_count = timer[id].tick_count;
 		}
 	}
 	return elapsed;
 }
 
-uint32_t timer__get_ms(uint8_t id)
+uint32_t timer__get_ticks(uint8_t id)
 {
-	uint32_t ms = 0;
+	uint32_t ticks = 0;
 	if(id < NUM_TIMER_DRIVERS)
 	{
-		ms = timer[id].ms_count;
+		ticks = timer[id].tick_count;
 	}
-	return ms;
+	return ticks;
 }
 
 void timer__interrupt_handler(uint8_t id)
 {
-	timer[id].ms_count++;
+	timer[id].tick_count++;
 	timer[id].regs->SR &= ~TIM_SR_UIF;
 }
 
