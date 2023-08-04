@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define AT_INTERFACE_SEND_DELAY_MS 1000
+#define AT_INTERFACE_SEND_DELAY_MS 500
 
 enum
 {

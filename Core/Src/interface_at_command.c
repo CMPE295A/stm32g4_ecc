@@ -360,7 +360,7 @@ static void step_multiline(int size, const char next_command[][KEY_MAX_LINE], ui
 	{
 		send_delay_count++;
 	}
-	if(send_delay_count >= 100)
+	if(send_delay_count >= 10)
 	{
 		send_at_cmd(next_command[i]);
 		if(++i == size)
