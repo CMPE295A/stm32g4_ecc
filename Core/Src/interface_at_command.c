@@ -81,6 +81,8 @@ static uint16_t char_index = 0;
 static uint32_t send_count = 0;
 static bool ms_tick = 0;
 static bool start_transition = false;
+static uint32_t start_tick = 0;
+static uint32_t last_response_duration = 0;
 
 
 
@@ -90,6 +92,7 @@ bool at_interface__initialize(void)
 	bool initialized = uart__initialize(AT_MODEM_UART, 115200);
 	send_at_cmd(AT_CMD_RESTORE);
 	state = AT_INTERFACE_INIT;
+	start_tick = HAL_GetTick();
 	return initialized;
 }
 
@@ -189,6 +192,11 @@ void at_interface__process(bool ms_elapsed)
 		{
 			last_state = state;
 			state = AT_INTERFACE_GET_SHARED_SECRET;
+		}
+		else if(line_is(AT_RESPONSE_OK))
+		{
+			uint32_t end_tick = HAL_GetTick();
+			last_response_duration = end_tick - start_tick;
 		}
 		break;
 
@@ -297,6 +305,7 @@ bool at_interface__publish_string(char *str)
 			memcpy(&cmd_string[index], AT_CMD_ENDING, suffix_len);
 			send_at_cmd(cmd_string);
 			sent = true;
+			start_tick = HAL_GetTick();
 		}
 	}
 	return sent;
