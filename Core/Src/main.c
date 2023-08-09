@@ -27,44 +27,32 @@
 
 #define MAX_PRIVATE_KEY_LEN 256
 
+/* Private typedef -----------------------------------------------------------*/
+/* USER CODE BEGIN PTD */
+HAL_StatusTypeDef hal_status = HAL_OK;
+
+ // ECC context
+ cmox_ecc_handle_t ecc_ctx;
+
+ // CBC context handle
+ cmox_cbc_handle_t Cbc_Ctx;
+
+ //ECC working buffer
+ uint8_t working_buffer[4000];
+
+ // Random data buffer
+ uint32_t Computed_Random[32];
+
+ __IO TestStatus glob_status = FAILED;
+
+ /* USER CODE END PTD */
 
 /* Private variables ---------------------------------------------------------*/
+ /* USER CODE BEGIN PV */
+
  UART_HandleTypeDef huart2;
-/*
-server side
-curve:	secp256k1
-server's public key: 0486690d59b5dcd031dd9bdc7addd9cc2de0ace5970c37bd751394bd0c73972a
-					a4f05c3c0f513e31796a4ee559d8ef518103f25565a1e1a6a307ddfd2e0cc06220
-*/
 
- /* for HKDF:
-
- const uint8_t IKM[] =
- {
-		  0xff, 0x62, 0x4d, 0x0b, 0xa0, 0x2c, 0x7b, 0x63, 0x70, 0xc1, 0x62, 0x2e, 0xec, 0x3f, 0xa2, 0x18,
-		  0x6e, 0xa6, 0x81, 0xd1, 0x65, 0x9e, 0x0a, 0x84, 0x54, 0x48, 0xe7, 0x77, 0xb7, 0x5a, 0x8e, 0x77,
-		  0xa7, 0x7b, 0xb2, 0x6e, 0x57, 0x33, 0x17, 0x9d, 0x58, 0xef, 0x9b, 0xc8, 0xa4, 0xe8, 0xb6, 0x97,
-		  0x1a, 0xef, 0x25, 0x39, 0xf7, 0x7a, 0xb0, 0x96, 0x3a, 0x34, 0x15, 0xbb, 0xd6, 0x25, 0x83, 0x39,
-		  0xbd, 0x1b, 0xf5, 0x5d, 0xe6, 0x5d, 0xb5, 0x20, 0xc6, 0x3f, 0x5b, 0x8e, 0xab, 0x3d, 0x55, 0xde,
-		  0xbd, 0x05, 0xe9, 0x49, 0x42, 0x12, 0x17, 0x0f, 0x5d, 0x65, 0xb3, 0x28, 0x6b, 0x8b, 0x66, 0x87,
-		  0x05, 0xb1, 0xe2, 0xb2, 0xb5, 0x56, 0x86, 0x10, 0x61, 0x7a, 0xbb, 0x51, 0xd2, 0xdd, 0x0c, 0xb4,
-		  0x50, 0xef, 0x59, 0xdf, 0x4b, 0x90, 0x7d, 0xa9, 0x0c, 0xfa, 0x7b, 0x26, 0x8d, 0xe8, 0xc4, 0xc2
-
- };
- const uint8_t info[]=
- {
-		 0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x74, 0x68, 0x69, 0x73, 0x20, 0x69, 0x73, 0x20, 0x63, 0x6d,
-		 	0x70, 0x65, 0x32, 0x39, 0x35
- };
-
- const uint8_t salt[] =
- {
-   0x58, 0xf7, 0x41, 0x77, 0x16, 0x20, 0xbd, 0xc4, 0x28, 0xe9, 0x1a, 0x32, 0xd8, 0x6d, 0x23, 0x08,
-   0x73, 0xe9, 0x14, 0x03, 0x36, 0xfc, 0xfb, 0x1e, 0x12, 0x28, 0x92, 0xee, 0x1d, 0x50, 0x1b, 0xdb
- };
-*/
-
- const uint8_t IV[] =
+const uint8_t IV[] =
  {
    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f};
 
@@ -76,19 +64,12 @@ uint8_t Plaintext[] =
    0xf6, 0x9f, 0x24, 0x45, 0xdf, 0x4f, 0x9b, 0x17, 0xad, 0x2b, 0x41, 0x7b, 0xe6, 0x6c, 0x37, 0x10
  };
 
- //to
- const uint8_t Random[] =
+const uint8_t Random[] =
  {
    0x7d, 0x7d, 0xc5, 0xf7, 0x1e, 0xb2, 0x9d, 0xda, 0xf8, 0x0d, 0x62, 0x14, 0x63, 0x2e, 0xea, 0xe0,
    0x3d, 0x90, 0x58, 0xaf, 0x1f, 0xb6, 0xd2, 0x2e, 0xd8, 0x0b, 0xad, 0xb6, 0x2b, 0xc1, 0xa5, 0x34
  };
- const uint8_t serverPublicKey[]=
- {
-	0x86, 0x69, 0x0d, 0x59, 0xb5, 0xdc, 0xd0, 0x31, 0xdd, 0x9b, 0xdc, 0x7a, 0xdd, 0xd9, 0xcc, 0x2d,
-	0xe0, 0xac, 0xe5, 0x97, 0x0c, 0x37, 0xbd, 0x75, 0x13, 0x94, 0xbd, 0x0c, 0x73, 0x97, 0x2a, 0xa4,
-	0xf0, 0x5c, 0x3c, 0x0f, 0x51, 0x3e, 0x31, 0x79, 0x6a, 0x4e, 0xe5, 0x59, 0xd8, 0xef, 0x51, 0x81,
-	0x03, 0xf2, 0x55, 0x65, 0xa1, 0xe1, 0xa6, 0xa3, 0x07, 0xdd, 0xfd, 0x2e, 0x0c, 0xc0, 0x62, 0x20
- };
+
 /*
  * efc93803bd60c2be2a864409a289373126cc6554fa1f6c01f096dbf98b810abf
  */
@@ -111,6 +92,26 @@ uint8_t Plaintext[] =
   0xeb,0x71,0x20,0xda,0xf2,0x3d,0x8e,0x16,0x6e,0x20,0x5d,0x93,0xc9
 };
 /*
+--------------MCU public key------------
+1ebde72699eb046423784bd9f329a59ab485555dd83d45c7dc0c51928d159ac7f21e21d6b598e1e1e1719943b793f7f76886fb78f87879c32b2bce64309237ff
+*/
+uint8_t mcuPublicKey[]={
+	 0x1e , 0xbd , 0xe7 , 0x26 ,0x99 ,0xeb ,0x04 ,0x64 ,0x23 ,0x78 ,0x4b,0xd9 ,
+	 0xf3 , 0x29 , 0xa5 ,0x9a , 0xb4 ,0x85 , 0x55 ,0x5d , 0xd8 ,0x3d ,
+	 0x45 ,0xc7 , 0xdc ,0x0c , 0x51 ,0x92 , 0x8d ,0x15 , 0x9a ,0xc7 ,
+	 0xf2 ,0x1e , 0x21 ,0xd6 , 0xb5 ,0x98 , 0xe1 ,0xe1 , 0xe1 ,0x71 , 0x99 ,0x43 ,
+	 0xb7 ,0x93 ,0xf7 ,0xf7 , 0x68,0x86 , 0xfb ,0x78 , 0xf8 ,0x78 , 0x79 ,0xc3 ,
+	 0x2b ,0x2b , 0xce ,0x64, 0x30 ,0x92 , 0x37 ,0xff
+};
+/*
+----------MCU private key------------
+7d7dc5f71eb29ddaf80d6214632eeae03d9058af1fb6d22ed80b
+*/
+const uint8_t mcuPrivateKey[]={
+	 0x7d , 0x7d , 0xc5 , 0xf7 , 0x1e ,	0xb2 ,0x9d, 0xda ,0xf8 ,0x0d ,0x62 ,0x14 ,0x63 ,0x2e , 0xea , 0xe0 ,
+	 0x3d ,	0x90 , 0x58 ,	0xaf , 0x1f ,0xb6 ,0xd2 ,0x2e , 0xd8 , 0x0b ,0xad ,	0xb6 ,0x2b ,0xc1 ,0xa5,0x35
+};
+/*
  // SECP256R1 curve
  //	uint8_t Computed_Secret[CMOX_ECC_SECP256R1_SECRET_LEN];
  //	uint8_t pubKey[CMOX_ECC_SECP256R1_PUBKEY_LEN];
@@ -129,43 +130,14 @@ uint8_t Plaintext[] =
  uint8_t pubKey[CMOX_ECC_SECP256K1_PUBKEY_LEN];
  uint8_t privateKey[CMOX_ECC_SECP256K1_PRIVKEY_LEN];
 
- uint8_t Computed_Ciphertext[CMOX_CIPHER_BLOCK_SIZE];
-/*
---------------MCU public key------------
-1ebde72699eb046423784bd9f329a59ab485555dd83d45c7dc0c51928d159ac7f21e21d6b598e1e1e1719943b793f7f76886fb78f87879c32b2bce64309237ff
-*/
- const uint8_t mcuPublicKey[]={
-		 0x1e , 0xbd , 0xe7 , 0x26 ,0x99 ,0xeb ,0x04 ,0x64 ,0x23 ,0x78 ,0x4b,0xd9 ,
-		 0xf3 , 0x29 , 0xa5 ,0x9a , 0xb4 ,0x85 , 0x55 ,0x5d , 0xd8 ,0x3d ,
-		 0x45 ,0xc7 , 0xdc ,0x0c , 0x51 ,0x92 , 0x8d ,0x15 , 0x9a ,0xc7 ,
-		 0xf2 ,0x1e , 0x21 ,0xd6 , 0xb5 ,0x98 , 0xe1 ,0xe1 , 0xe1 ,0x71 , 0x99 ,0x43 ,
-		 0xb7 ,0x93 ,0xf7 ,0xf7 , 0x68,0x86 , 0xfb ,0x78 , 0xf8 ,0x78 , 0x79 ,0xc3 ,
-		 0x2b ,0x2b , 0xce ,0x64, 0x30 ,0x92 , 0x37 ,0xff
- };
- /*
-----------MCU private key------------
-7d7dc5f71eb29ddaf80d6214632eeae03d9058af1fb6d22ed80b
-*/
- const uint8_t mcuPrivateKey[]={
-		 0x7d , 0x7d , 0xc5 , 0xf7 , 0x1e ,	0xb2 ,0x9d, 0xda ,0xf8 ,0x0d ,0x62 ,0x14 ,0x63 ,0x2e , 0xea , 0xe0 ,
-		 0x3d ,	0x90 , 0x58 ,	0xaf , 0x1f ,0xb6 ,0xd2 ,0x2e , 0xd8 , 0x0b ,0xad ,	0xb6 ,0x2b ,0xc1 ,0xa5,0x35
- };
- // ECC context
- cmox_ecc_handle_t Ecc_Ctx;
+ //uint8_t Computed_Ciphertext[CMOX_CIPHER_BLOCK_SIZE];
+ //uint8_t Computed_Plaintext[CMOX_CIPHER_BLOCK_SIZE];
 
- // CBC context handle
- cmox_cbc_handle_t Cbc_Ctx;
-
- //ECC working buffer
- uint8_t Working_Buffer[4000];
-
- // Random data buffer
- uint32_t Computed_Random[32];
-
- // RNG peripheral handle
- RNG_HandleTypeDef hrng;
-
- __IO TestStatus glob_status = FAILED;
+ uint8_t Computed_Ciphertext[64];
+ uint8_t Computed_Plaintext[64];
+// RNG peripheral handle
+RNG_HandleTypeDef hrng;
+ /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
@@ -210,20 +182,39 @@ int get_drone_status_string(drone_status_t *status, char *str)
 {
 	//return sprintf(str, "\"{\"GPS\":[%.4f, %.4f],\"Battery\":%.1f%,\"Temperature\":%.1fC}\"", status->lat, status->lon, status->battery, status->temperature);
 }
+void convert_to_hex_string(const uint8_t *inputArray, size_t inputLength, char *outputString) {
+    for (size_t i = 0; i < inputLength; i++) {
+        snprintf(&outputString[i * 2], 3, "%02x", inputArray[i]);
+    }
+    outputString[inputLength * 2] = '\0'; // null-terminate the string
+}
+void convert_to_byte_array(const char *hexString, uint8_t *outputArray, size_t *outputLength) {
+    size_t inputLength = strlen(hexString);
+    if (inputLength % 2 != 0) {
+        // handle odd-length strings
+        return;
+    }
+    size_t arrayLength = inputLength / 2;
+    *outputLength = arrayLength;
+    for (size_t i = 0; i < arrayLength; i++) {
+        sscanf(&hexString[i * 2], "%2hhx", &outputArray[i]);
+    }
+}
+
 int main(void)
 {
+	 /* USER CODE BEGIN 1 */
 	  cmox_ecc_retval_t retval_sharedSecret; //return value for cmox_ecdh
 	  size_t computed_size;
 	  cmox_ecc_retval_t retval_mcuKeys;	//return value for cmox_ecdsa_keyGen
 	  cmox_cipher_retval_t retval_cipher;	//return value for cmox_cipher_encrypt
 	  size_t computed_cipher;	//Computed_Ciphertex and Computed_Plaintext
-	  //cmox_mac_retval_t retval_hash; //return value for cmox_mac_compute (HKDF)
-	  //uint32_t index;
-	  uint32_t startTick = 0;
-	  uint32_t endTick = 0;
-	  uint32_t elapsedTime = 0;
+	  //uint32_t startTick = 0;
+	  //uint32_t endTick = 0;
+	  //uint32_t elapsedTime = 0;
 	  /* Fault check verification variable */
 	  uint32_t fault_check = CMOX_ECC_AUTH_FAIL;
+	  /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
 
@@ -245,7 +236,6 @@ int main(void)
   MX_GPIO_Init();
 
   timer__initialize(DRIVER_TIMER2, TIMER_MS_PER_SECOND);
-  //uint16_t count = 0;
 
   hrng.Instance = RNG;
   hrng.Init.ClockErrorDetection = RNG_CED_ENABLE;
@@ -253,20 +243,9 @@ int main(void)
   {
     Error_Handler();
   }
-
-  // Initialize cryptographic library
-  if (cmox_initialize(NULL) != CMOX_INIT_SUCCESS)
-  {
-    Error_Handler();
-  }
-  wait_ms(1000);
-  HAL_GPIO_WritePin(WIFI_MODEM_RESET_PORT, WIFI_MODEM_RESET_PIN, GPIO_PIN_SET);
-  wait_ms(1000);
-  at_interface__initialize();
 /*
  //Uncomment to use random number in cmox_ecdsa_keyGen
-/
- * /Generate random number to use Computed_Random in cmox_ecdsa_keyGen function
+ //Generate random number to use Computed_Random in cmox_ecdsa_keyGen function
 
   for (uint32_t i = 0; i < sizeof(Computed_Random) / sizeof(uint32_t); i++)
          {
@@ -282,49 +261,49 @@ int main(void)
   {
     Error_Handler();
   }
-  cmox_ecc_construct(&Ecc_Ctx, CMOX_ECC256_MATH_FUNCS, Working_Buffer, sizeof(Working_Buffer));
+  cmox_ecc_construct(&ecc_ctx, CMOX_ECC256_MATH_FUNCS, working_buffer, sizeof(working_buffer));
 
   /*
    * for CMOX_ECC_BPP512T1_LOWMEM curve use
-   *    cmox_ecc_construct(&Ecc_Ctx, CMOX_ECC128MULT_MATH_FUNCS, Working_Buffer, sizeof(Working_Buffer));
+   *    cmox_ecc_construct(&ecc_ctx, CMOX_ECC128MULT_MATH_FUNCS, working_buffer, sizeof(working_buffer));
    */
-  startTick = HAL_GetTick();
-/*
-  //generates public and private key for mcu
-  retval_mcuKeys=cmox_ecdsa_keyGen(&Ecc_Ctx,
-		  CMOX_ECC_SECP256K1_LOWMEM,								//SECP256K1 curve
-		  //CMOX_ECC_BPP512T1_LOWMEM,
-		  Random, sizeof(Random),									//for testing - comment this line when you want to use random number
-		  //(uint8_t *)Computed_Random, sizeof(Computed_Random),	//uncomment this line to use random number
-		  (uint8_t*)privateKey, CMOX_ECC_SECP256K1_PRIVKEY_LEN,				//mcu private key
-		  (uint8_t*)pubKey, CMOX_ECC_SECP256K1_PUBKEY_LEN);					//mcu public key
-  endTick = HAL_GetTick();
-  elapsedTime = endTick - startTick;
+  //startTick = HAL_GetTick();
+
+  //generate public and private key for mcu
+  retval_mcuKeys=cmox_ecdsa_keyGen(&ecc_ctx,
+		  CMOX_ECC_SECP256K1_LOWMEM,								// [in] SECP256K1 curve
+		  //CMOX_ECC_BPP512T1_LOWMEM,								// [in] BRAINPOOL T-512 curve
+		  Random, sizeof(Random),									// [in] for testing - comment this line when you want to use random number using RNG
+		  //(uint8_t *)Computed_Random, sizeof(Computed_Random),	// [in] uncomment this line to use random number
+		  (uint8_t*)privateKey, CMOX_ECC_SECP256K1_PRIVKEY_LEN,		// [out] mcu private key
+		  (uint8_t*)pubKey, CMOX_ECC_SECP256K1_PUBKEY_LEN);			// [out] mcu public key
+  //endTick = HAL_GetTick();
+  //elapsedTime = endTick - startTick;
 
   // Verify API returned value
     if (retval_mcuKeys != CMOX_ECC_SUCCESS)
     {
       Error_Handler();
     }
-*/    // Cleanup context
-    cmox_ecc_cleanup(&Ecc_Ctx);
+    // Cleanup context
+    cmox_ecc_cleanup(&ecc_ctx);
 
-    startTick = HAL_GetTick();
-    cmox_ecc_construct(&Ecc_Ctx, CMOX_ECC256_MATH_FUNCS, Working_Buffer, sizeof(Working_Buffer));
+    //startTick = HAL_GetTick();
+    cmox_ecc_construct(&ecc_ctx, CMOX_ECC256_MATH_FUNCS, working_buffer, sizeof(working_buffer));
     /*
      * for CMOX_ECC_BPP512T1_LOWMEM curve use
-     *    cmox_ecc_construct(&Ecc_Ctx, CMOX_ECC128MULT_MATH_FUNCS, Working_Buffer, sizeof(Working_Buffer));
+     *    cmox_ecc_construct(&ecc_ctx, CMOX_ECC128MULT_MATH_FUNCS, working_buffer, sizeof(working_buffer));
      */
     //generate shared secret using mcu's private key and remote public key
-    retval_sharedSecret = cmox_ecdh(&Ecc_Ctx,                                         // ECC context
-						  //CMOX_ECC_BPP512T1_LOWMEM,
-		  	  	  	  	  CMOX_ECC_SECP256K1_LOWMEM,                         // SECP256K1 ECC curve selected
-						  //(uint8_t *)privateKey, sizeof(privateKey),         // Local Private key
-						  mcuPrivateKey, sizeof(mcuPrivateKey),
-						  sPublicKey, sizeof(sPublicKey),
-						  sharedSecret, &computed_size);      // Data buffer to receive shared secret
-  endTick = HAL_GetTick();
-  elapsedTime = endTick - startTick;
+    retval_sharedSecret = cmox_ecdh(&ecc_ctx,                                       // [in] ECC context
+						  //CMOX_ECC_BPP512T1_LOWMEM,								// [in] BRAINPOOL T-512 curve
+		  	  	  	  	  CMOX_ECC_SECP256K1_LOWMEM,                         		// [in] SECP256K1 ECC curve selected
+						  (uint8_t *)privateKey, sizeof(privateKey),         		// [in] mcu private key
+						  //mcuPrivateKey, sizeof(mcuPrivateKey),
+						  sPublicKey, sizeof(sPublicKey),							// [in] server public key
+						  sharedSecret, &computed_size);      						// [out] data buffer to receive shared secret
+  //endTick = HAL_GetTick();
+  //elapsedTime = endTick - startTick;
   // Verify API returned value
     if (retval_sharedSecret != CMOX_ECC_SUCCESS)
     {
@@ -337,178 +316,68 @@ int main(void)
       Error_Handler();
     }
     // cleanup context
-    cmox_ecc_cleanup(&Ecc_Ctx);
+    cmox_ecc_cleanup(&ecc_ctx);
 
     if (cmox_initialize(NULL) != CMOX_INIT_SUCCESS)
     {
       Error_Handler();
     }
-    startTick = HAL_GetTick();
+    //startTick = HAL_GetTick();
     //AES CBC ENCRYPTION for 256-bit key length
-    retval_cipher = cmox_cipher_encrypt(CMOX_AESFAST_CBC_ENC_ALGO,                  // Use AES EBC algorithm
-    									Plaintext, sizeof(Plaintext),           	// Plaintext to encrypt
-										sharedSecret, CMOX_CIPHER_256_BIT_KEY, 	// AES key to use
-										IV, sizeof(IV),                         	// Initialization vector
-        								(uint8_t *)Computed_Ciphertext, &computed_cipher); // Data buffer to receive generated ciphertext
+    retval_cipher = cmox_cipher_encrypt(CMOX_AESFAST_CBC_ENC_ALGO,                  	// [in] AES CBC algorithm
+    									Plaintext, sizeof(Plaintext),           		// [in] plaintext to encrypt
+										sharedSecret, CMOX_CIPHER_256_BIT_KEY, 			// [in] AES key to use
+										IV, sizeof(IV),                         		// [in] initialization vector
+        								(uint8_t *)Computed_Ciphertext, &computed_cipher); // [out] data buffer to receive generated ciphertext
     //Verify API returned value
     if (retval_cipher != CMOX_CIPHER_SUCCESS)
     {
     	Error_Handler();
     }
-    endTick = HAL_GetTick();
-    elapsedTime = endTick - startTick;
+    //endTick = HAL_GetTick();
+    //elapsedTime = endTick - startTick;
 
-    // No more need of cryptographic services, finalize cryptographic library
-           if (cmox_finalize(NULL) != CMOX_INIT_SUCCESS)
-           {
-             Error_Handler();
-           }
-           glob_status = PASSED;
-    /*
-    startTick = HAL_GetTick();
-    	// AES CBC DECRYPTION - using Computed_Secret
-        retval_cipher = cmox_cipher_decrypt(CMOX_AESFAST_CBC_DEC_ALGO,                 // Use AES EBC algorithm
-        									Computed_Ciphertext, sizeof(Computed_Ciphertext), // Ciphertext to decrypt
-											Computed_Secret, CMOX_CIPHER_256_BIT_KEY,                      // AES key to use
-    										IV, sizeof(IV),                        // Initialization vector
-    										Computed_Plaintext, &computed_cipher);   // Data buffer to receive generated plaintext
-        //Verify API returned value
-        if (retval_cipher != CMOX_CIPHER_SUCCESS)
-        {
-        	Error_Handler();
-         }
-        // Verify generated data are the expected ones
-        if (memcmp(Plaintext, Computed_Plaintext, computed_cipher) != 0)
-        {
-        	Error_Handler();
-        }
-        endTick = HAL_GetTick();
-        elapsedTime = endTick - startTick;
-*/
-
-    /*
-    //HKDF Function - hmac key derivation function -
-    //computed_PRK - psuedorandom key generated using Computed_Secret
-    //computed_OKM - output keying material - can be considered as master key
-
-    //Computed data buffer
-     uint8_t computed_hash[CMOX_SHA256_SIZE];
-     uint8_t computed_PRK[CMOX_SHA256_SIZE];
-     uint8_t computed_OKM[128];  // L    = 128
-
-     // HMAC context handle
-     cmox_hmac_handle_t Hmac_Ctx;
-     //size_t computed_size1;
-     // General mac context
-     cmox_mac_handle_t *mac_ctx;
-     uint32_t L = 128;
-     uint32_t N = 0;
+    //No more need of cryptographic services, finalize cryptographic library
+   if (cmox_finalize(NULL) != CMOX_INIT_SUCCESS)
+   {
+	 Error_Handler();
+   }
+   glob_status = PASSED;
 
 
-     // Initialize cryptographic library
-     if (cmox_initialize(NULL) != CMOX_INIT_SUCCESS) Error_Handler();
+	 char pubKeyStr[sizeof(pubKey) * 2 + 1]; // double the size for two hexadecimal digits per byte + 1 for null terminator
+	 convert_to_hex_string(pubKey, sizeof(pubKey), pubKeyStr);
 
+	 /*
+	 char test_str[]="1ebde72699eb046423784bd9f329a59ab485555dd83d45c7dc0c51928d159ac7f21e21d6b598e1e1e1719943b793f7f76886fb78f87879c32b2bce64309237ff";
+	 uint8_t test_str_array[sizeof(test_str) / 2];
+	 size_t test_str_arr_length = 0;
+	 convert_to_byte_array(test_str, test_str_array, &test_str_arr_length);
 
-      // Compute PRK = HMAC-Hash(salt, IKM)
+	 printf("converted array: ");
+		for (size_t i = 0; i < test_str_arr_length; i++) {
+			printf("0x%02x ", test_str_array[i]);
+		}
+		printf("\n");
+	  */
 
-     retval_hash = cmox_mac_compute(CMOX_HMAC_SHA256_ALGO,
-							 	 Computed_Secret, sizeof(Computed_Secret),
-								   salt, sizeof(salt),
-								   NULL, 0,
-								   computed_PRK,
-								   CMOX_SHA256_SIZE,
-								   &computed_size);
-
-     // Verify API returned value
-     if (retval_hash != CMOX_MAC_SUCCESS) Error_Handler();
-
-      // Compute N = ceil(L/HashLen)
-
-     N = (uint32_t)(L / CMOX_SHA256_SIZE);
-     if ((N * CMOX_SHA256_SIZE) < L) N++;
-*/
-     /*
-      * Compute OKM = first L octets of T
-      * where:
-      * T(0) = empty string (zero length)
-      * T(1) = HMAC-Hash(PRK, T(0) | info | 0x01)
-      * T(2) = HMAC-Hash(PRK, T(1) | info | 0x02)
-      * T(3) = HMAC-Hash(PRK, T(2) | info | 0x03)
-      ...
-      */
 /*
-     mac_ctx = cmox_hmac_construct(&Hmac_Ctx, CMOX_HMAC_SHA256);
-     if (mac_ctx == NULL) Error_Handler();
-
-     index = 0;
-     for (uint8_t i = 1; i <= N; i++)
-     {
-    	 retval_hash = cmox_mac_init(mac_ctx);
-       if (retval_hash != CMOX_MAC_SUCCESS) Error_Handler();
-       // For the last iteration, tag length may be reduced to fit requested length L
-       if (i == N)
-       {
-    	   retval_hash = cmox_mac_setTagLen(mac_ctx, L - index);
-       }
-       if (retval_hash != CMOX_MAC_SUCCESS) Error_Handler();
-       retval_hash = cmox_mac_setKey(mac_ctx, computed_PRK, sizeof(computed_PRK));
-
-       if (retval_hash != CMOX_MAC_SUCCESS) Error_Handler();
-       if (i > 1)
-       {
-    	   retval_hash = cmox_mac_append(mac_ctx, computed_hash, CMOX_SHA256_SIZE);
-         if (retval_hash != CMOX_MAC_SUCCESS) Error_Handler();
-       }
-       retval_hash = cmox_mac_append(mac_ctx, info, sizeof(info));
-       if (retval_hash != CMOX_MAC_SUCCESS) Error_Handler();
-       retval_hash = cmox_mac_append(mac_ctx, &i, 1);
-       if (retval_hash != CMOX_MAC_SUCCESS) Error_Handler();
-       retval_hash = cmox_mac_generateTag(mac_ctx, computed_hash, NULL);
-       if (retval_hash != CMOX_MAC_SUCCESS) Error_Handler();
-       if (i == N)
-       {
-         memcpy(&computed_OKM[index], computed_hash, L - index);
-         index = L;
-       }
-       else
-       {
-         memcpy(&computed_OKM[index], computed_hash, CMOX_SHA256_SIZE);
-         index += CMOX_SHA256_SIZE;
-       }
-     }
-     retval_hash = cmox_mac_cleanup(mac_ctx);
-
-     if (retval_hash != CMOX_MAC_SUCCESS) Error_Handler();
-
-     	 	 // AES CBC ENCRYPTION - using computed_OKM
-
-             retval_cipher = cmox_cipher_encrypt(CMOX_AESFAST_CBC_ENC_ALGO,                  // Use AES EBC algorithm
-                                          	  Plaintext, sizeof(Plaintext),           // Plaintext to encrypt
-											  computed_OKM, CMOX_CIPHER_128_BIT_KEY, // AES key to use
-											  IV, sizeof(IV),                         // Initialization vector
-											  (uint8_t *)Computed_Ciphertext, &computed_cipher); // Data buffer to receive generated ciphertext
-             //Verify API returned value
-             if (retval_cipher != CMOX_CIPHER_SUCCESS)
-             {
-               Error_Handler();
-             }
-     	 	 // AES CBC DECRYPTION - using computed_OKM
-             retval_cipher = cmox_cipher_decrypt(CMOX_AESFAST_CBC_DEC_ALGO,                 // Use AES EBC algorithm
-                							Computed_Ciphertext, sizeof(Computed_Ciphertext), // Ciphertext to decrypt
-											computed_OKM, CMOX_CIPHER_128_BIT_KEY,                      // AES key to use
-											IV, sizeof(IV),                        // Initialization vector
-											Computed_Plaintext, &computed_cipher);   // Data buffer to receive generated plaintext
-                  //Verify API returned value
-                  if (retval_cipher != CMOX_CIPHER_SUCCESS)
-                  {
-                    Error_Handler();
-                  }
-                  // Verify generated data are the expected ones
-                  if (memcmp(Plaintext, Computed_Plaintext, computed_cipher) != 0)
-                  {
-                    Error_Handler();
-                  }
-                  */
+	   //AES CBC DECRYPTION for 256-bit key length
+	   retval_cipher = cmox_cipher_decrypt(CMOX_AESFAST_CBC_DEC_ALGO,                  				// [in] AES CBC algorithm
+											Computed_Ciphertext, sizeof(Computed_Ciphertext),       // [in] ciphertext to decrypt
+											sharedSecret, CMOX_CIPHER_256_BIT_KEY, 					// [in] AES key to use
+											IV, sizeof(IV),                         				// [in] initialization vector
+											(uint8_t *)Computed_Plaintext, &computed_cipher); 		// [out] data buffer to receive decrypted plaintext
+	   	   //Verify API returned value
+		  if (retval_cipher != CMOX_CIPHER_SUCCESS)
+		  {
+			Error_Handler();
+		  }
+*/
+           wait_ms(1000);
+           HAL_GPIO_WritePin(WIFI_MODEM_RESET_PORT, WIFI_MODEM_RESET_PIN, GPIO_PIN_SET);
+           wait_ms(1000);
+           at_interface__initialize();
 
            int count = 0;
              static const char test_string_aws[] = "\"{\"status\":\"c0f958353c5af040db056247f4d7dd9f\",\"gps\":{\"latitude\":\"test\",\"longitude\":\"10f4678d15f185427e2911791d751b8f\"},\"batteryLevel\":\"ca74ca2f55cbe7f92789a704ff686c2f\",\"temperature\":\"ca74ca2f55cbe7f92789a704ff686c2f\"}\"";
