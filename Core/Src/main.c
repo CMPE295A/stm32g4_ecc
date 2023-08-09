@@ -25,6 +25,8 @@
 #include <string.h>
 #include "interface_mqtt.h"
 
+#define MAX_PRIVATE_KEY_LEN 256
+
 
 /* Private variables ---------------------------------------------------------*/
  UART_HandleTypeDef huart2;
@@ -512,19 +514,14 @@ int main(void)
              static const char test_string_aws[] = "\"{\"status\":\"c0f958353c5af040db056247f4d7dd9f\",\"gps\":{\"latitude\":\"test\",\"longitude\":\"10f4678d15f185427e2911791d751b8f\"},\"batteryLevel\":\"ca74ca2f55cbe7f92789a704ff686c2f\",\"temperature\":\"ca74ca2f55cbe7f92789a704ff686c2f\"}\"";
 
              char data_string[100];
+             char private_key_str[MAX_PRIVATE_KEY_LEN] = {0};
            //  static const char TEST_STRING[] = "\"{\"GPS\":[37.3387,-121.8853],\"Battery\":45%,\"Temperature\": 21.1C}\"";
-             uint32_t start_us = 0;
-             uint32_t end_us= 0;
-             uint32_t duration_us = 0;
+             bool got_shared_secret = false;
              while (1)
              {
            	  bool ms_elapsed = false;
            	  if(timer__ms_elapsed(DRIVER_TIMER2))
            	  {
-           		  if(start_us > 0)
-           		  {
-           			  duration_us = end_us - start_us;
-           		  }
            		  ms_elapsed = true;
            		  mqtt__process();
            		  if(++count == 1000)
@@ -532,11 +529,21 @@ int main(void)
 
            			  count = 0;
            //			  at_interface__publish_test();
-           			  drone_status_t data = {0};
-           			  get_drone_status(&data);
-           			  get_drone_status_string(&data, data_string);
-           			  // encrypt string
-           			  mqtt__publish(test_string_aws, strlen(test_string_aws));
+           			  if(got_shared_secret)
+           			  {
+						  drone_status_t data = {0};
+						  get_drone_status(&data);
+						  get_drone_status_string(&data, data_string);
+						  // encrypt string
+						  mqtt__publish(test_string_aws, strlen(test_string_aws));
+           			  }
+           			  else
+           			  {
+           				  if(mqtt__get_sub_message(private_key_str, MAX_PRIVATE_KEY_LEN) != 0)
+           				  {
+           					got_shared_secret = true;
+           				  }
+           			  }
            		  }
            	  }
            	  at_interface__process(ms_elapsed);

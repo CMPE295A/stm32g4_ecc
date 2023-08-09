@@ -40,6 +40,7 @@ static const char AT_CMD_MQTT_PUBLISH_TEST[] = "AT+MQTTPUB=\"TESTING\"\r\n";
 static const char AT_CMD_MQTT_PUBLISH_PREFIX[] = "AT+MQTTPUB=";
 
 static const char AT_CMD_MQTT_TOPIC_STATUS_AWS[] = "AT+MQTTTOPIC=\"$aws/things/Microcontroller/shadow/name/shadow/update\",\"$aws/things/Microcontroller/shadow/name/shadow/update/accepted\"\r\n";
+static const char AT_RESPONSE_MQTT_SUB_TOPIC[] = "$aws/things/Microcontroller/shadow/name/shadow/update/accepted -> ";
 static const char AT_CMD_MQTT_SETUP_AWS[] = "AT+MQTTSET=\"\",\"\",\"Microcontroller\",60\r\n";
 static const char AT_CMD_AWS_CONNECT[] = "AT+AWSCON=\"a3vvj2kk3rs3as-ats.iot.us-west-1.amazonaws.com\"\r\n";
 
@@ -64,6 +65,8 @@ static uint16_t last_state = AT_INTERFACE_INIT;
 
 static void read(void);
 static bool line_is(const char *str);
+static bool last_line_empty(void);
+static bool next_to_last_line_is(const char *str);
 static void send_at_cmd(const char *cmd);
 static void transition(const char *next_cmd, uint8_t next_state);
 static void step(const char *response, const char *next_command, uint8_t next_state);
@@ -72,6 +75,7 @@ static void step_multiline(int size, const char next_command[][KEY_MAX_LINE], ui
 static char line_buffer[LINE_BUFFER_MAX][LINE_MAX_LEN];
 static char *line = &line_buffer[0][0];
 static char *last_line = (char*)EMPTY_LINE;
+static char *next_to_last_line = (char*)EMPTY_LINE;
 static uint16_t next_line = 1;
 static uint16_t char_index = 0;
 static uint32_t send_count = 0;
@@ -181,6 +185,20 @@ void at_interface__process(bool ms_elapsed)
 			state = AT_INTERFACE_INIT;
 			at_interface__initialize();
 		}
+		else if(next_to_last_line_is(AT_RESPONSE_MQTT_SUB_TOPIC))
+		{
+			last_state = state;
+			state = AT_INTERFACE_GET_SHARED_SECRET;
+		}
+		break;
+
+	case AT_INTERFACE_GET_SHARED_SECRET:
+		if(!last_line_empty())
+		{
+			mqtt__sub_set(last_line, strlen(last_line));
+			last_state = state;
+			state = AT_INTERFACE_NETWORK_UP;
+		}
 		break;
 
 	case AT_INTERFACE_MQTT_DISCONNECT:
@@ -289,10 +307,31 @@ static bool line_is(const char *str)
 	bool match = false;
 	if(strcmp(str, last_line) == 0)
 	{
+		next_to_last_line = last_line;
 		last_line = (char*)EMPTY_LINE;
 		match = true;
 	}
 	return match;
+}
+
+static bool next_to_last_line_is(const char *str)
+{
+	bool match = false;
+	if(strcmp(str, next_to_last_line) == 0)
+	{
+		match = true;
+	}
+	return match;
+}
+
+static bool last_line_empty(void)
+{
+	bool empty = false;
+	if(strcmp(EMPTY_LINE, last_line) == 0)
+	{
+		empty = true;
+	}
+	return empty;
 }
 
 static void read(void)
@@ -313,6 +352,7 @@ static void read(void)
 			if(char_index != 0)
 			{
 				line[char_index] = '\0';
+				next_to_last_line = last_line;
 				last_line = line;
 				line = &line_buffer[next_line][0];
 				if(++next_line == LINE_BUFFER_MAX)

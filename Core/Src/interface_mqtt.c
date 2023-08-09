@@ -14,6 +14,7 @@ enum
 static uint8_t state = MQTT_STATE_IDLE;
 static uint16_t pub_attempt = 0;
 static char pub_buffer[MAX_MQTT_PUB_BUFFER_BYTES] = {0};
+static char sub_buffer[MAX_MQTT_PUB_BUFFER_BYTES] = {0};
 
 void mqtt__process(void)
 {
@@ -49,4 +50,22 @@ bool mqtt__publish(char *message, uint16_t byte_length)
 		}
 	}
 	return registered;
+}
+
+void mqtt__sub_set(char *message, uint16_t byte_length)
+{
+	if (byte_length < MAX_MQTT_PUB_BUFFER_BYTES)
+	{
+		memcpy(sub_buffer, message, byte_length);
+	}
+}
+
+uint16_t mqtt__get_sub_message(char *message, uint16_t max_bytes)
+{
+	uint16_t byte_length = strlen(sub_buffer);
+	if((byte_length < max_bytes) && (byte_length > 0))
+	{
+		memcpy(message, sub_buffer, byte_length);
+	}
+	return byte_length;
 }
