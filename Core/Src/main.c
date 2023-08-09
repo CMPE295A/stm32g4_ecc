@@ -18,14 +18,17 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+
+/* Private includes ----------------------------------------------------------*/
+/* USER CODE BEGIN Includes */
 #include "driver_uart.h"
 #include "driver_timer.h"
 #include "cmox_crypto.h"
 #include "interface_at_command.h"
 #include <string.h>
 #include "interface_mqtt.h"
-
-#define MAX_PRIVATE_KEY_LEN 256
+#include "sensor.h"
+/* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
@@ -45,10 +48,29 @@ HAL_StatusTypeDef hal_status = HAL_OK;
 
  __IO TestStatus glob_status = FAILED;
 
- /* USER CODE END PTD */
+/* USER CODE END PTD */
+
+/* Private define ------------------------------------------------------------*/
+/* USER CODE BEGIN PD */
+#define MAX_PRIVATE_KEY_LEN 256
+/* USER CODE END PD */
+
+/* Private macro -------------------------------------------------------------*/
+/* USER CODE BEGIN PM */
+
+/* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
- /* USER CODE BEGIN PV */
+extern I2C_HandleTypeDef hi2c1;
+
+RNG_HandleTypeDef hrng;
+
+RTC_HandleTypeDef hrtc;
+
+extern UART_HandleTypeDef huart1;
+UART_HandleTypeDef huart2;
+
+/* USER CODE BEGIN PV */
 
  UART_HandleTypeDef huart2;
 
@@ -137,15 +159,23 @@ const uint8_t mcuPrivateKey[]={
  uint8_t Computed_Plaintext[64];
 // RNG peripheral handle
 RNG_HandleTypeDef hrng;
- /* USER CODE END PV */
+/* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void process_cli(void);
+static void MX_USART2_UART_Init(void);
 static void MX_RNG_Init(void);
+static void MX_RTC_Init(void);
+static void MX_I2C1_Init(void);
+static void MX_USART1_UART_Init(void);
+static void process_cli(void);
+/* USER CODE BEGIN PFP */
 
+/* USER CODE END PFP */
 
+/* Private user code ---------------------------------------------------------*/
+/* USER CODE BEGIN 0 */
 typedef struct{
 	  float lat;
 	  float lon;
@@ -154,12 +184,6 @@ typedef struct{
 }drone_status_t;
 
 static const drone_status_t test_data = {.lat=37.3387, .lon=-121.8853, .battery=45.0, .temperature=21.1};
-
-
-/**
-  * @brief  The application entry point.
-  * @retval int
-  */
 
 void wait_ms(int ms_wait_threshold)
 {
@@ -200,21 +224,26 @@ void convert_to_byte_array(const char *hexString, uint8_t *outputArray, size_t *
         sscanf(&hexString[i * 2], "%2hhx", &outputArray[i]);
     }
 }
+/* USER CODE END 0 */
 
+/**
+  * @brief  The application entry point.
+  * @retval int
+  */
 int main(void)
 {
-	 /* USER CODE BEGIN 1 */
-	  cmox_ecc_retval_t retval_sharedSecret; //return value for cmox_ecdh
-	  size_t computed_size;
-	  cmox_ecc_retval_t retval_mcuKeys;	//return value for cmox_ecdsa_keyGen
-	  cmox_cipher_retval_t retval_cipher;	//return value for cmox_cipher_encrypt
-	  size_t computed_cipher;	//Computed_Ciphertex and Computed_Plaintext
-	  //uint32_t startTick = 0;
-	  //uint32_t endTick = 0;
-	  //uint32_t elapsedTime = 0;
-	  /* Fault check verification variable */
-	  uint32_t fault_check = CMOX_ECC_AUTH_FAIL;
-	  /* USER CODE END 1 */
+  /* USER CODE BEGIN 1 */
+	cmox_ecc_retval_t retval_sharedSecret; //return value for cmox_ecdh
+	size_t computed_size;
+	cmox_ecc_retval_t retval_mcuKeys;	//return value for cmox_ecdsa_keyGen
+	cmox_cipher_retval_t retval_cipher;	//return value for cmox_cipher_encrypt
+	size_t computed_cipher;	//Computed_Ciphertex and Computed_Plaintext
+	//uint32_t startTick = 0;
+	//uint32_t endTick = 0;
+	//uint32_t elapsedTime = 0;
+	/* Fault check verification variable */
+	uint32_t fault_check = CMOX_ECC_AUTH_FAIL;
+  /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
 
@@ -227,201 +256,198 @@ int main(void)
 
   /* Configure the system clock */
   SystemClock_Config();
-  //SysTick_Config(SystemCoreClock / 1000);
+
   /* USER CODE BEGIN SysInit */
 
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-
+  MX_USART2_UART_Init();
+  MX_RNG_Init();
+  MX_RTC_Init();
+  MX_I2C1_Init();
+  MX_USART1_UART_Init();
+  /* USER CODE BEGIN 2 */
   timer__initialize(DRIVER_TIMER2, TIMER_MS_PER_SECOND);
-
   hrng.Instance = RNG;
   hrng.Init.ClockErrorDetection = RNG_CED_ENABLE;
   if (HAL_RNG_Init(&hrng) != HAL_OK)
   {
     Error_Handler();
   }
-/*
- //Uncomment to use random number in cmox_ecdsa_keyGen
- //Generate random number to use Computed_Random in cmox_ecdsa_keyGen function
-
-  for (uint32_t i = 0; i < sizeof(Computed_Random) / sizeof(uint32_t); i++)
-         {
-           if (HAL_RNG_GenerateRandomNumber(&hrng, &Computed_Random[i]) != HAL_OK)
-           {
-             // Random number generation error
-           Error_Handler();
-           }
-         }
-*/
-  // Initialize cryptographic library
-  if (cmox_initialize(NULL) != CMOX_INIT_SUCCESS)
-  {
-    Error_Handler();
-  }
-  cmox_ecc_construct(&ecc_ctx, CMOX_ECC256_MATH_FUNCS, working_buffer, sizeof(working_buffer));
-
   /*
-   * for CMOX_ECC_BPP512T1_LOWMEM curve use
-   *    cmox_ecc_construct(&ecc_ctx, CMOX_ECC128MULT_MATH_FUNCS, working_buffer, sizeof(working_buffer));
-   */
-  //startTick = HAL_GetTick();
+   //Uncomment to use random number in cmox_ecdsa_keyGen
+   //Generate random number to use Computed_Random in cmox_ecdsa_keyGen function
 
-  //generate public and private key for mcu
-  retval_mcuKeys=cmox_ecdsa_keyGen(&ecc_ctx,
-		  CMOX_ECC_SECP256K1_LOWMEM,								// [in] SECP256K1 curve
-		  //CMOX_ECC_BPP512T1_LOWMEM,								// [in] BRAINPOOL T-512 curve
-		  Random, sizeof(Random),									// [in] for testing - comment this line when you want to use random number using RNG
-		  //(uint8_t *)Computed_Random, sizeof(Computed_Random),	// [in] uncomment this line to use random number
-		  (uint8_t*)privateKey, CMOX_ECC_SECP256K1_PRIVKEY_LEN,		// [out] mcu private key
-		  (uint8_t*)pubKey, CMOX_ECC_SECP256K1_PUBKEY_LEN);			// [out] mcu public key
-  //endTick = HAL_GetTick();
-  //elapsedTime = endTick - startTick;
+    for (uint32_t i = 0; i < sizeof(Computed_Random) / sizeof(uint32_t); i++)
+           {
+             if (HAL_RNG_GenerateRandomNumber(&hrng, &Computed_Random[i]) != HAL_OK)
+             {
+               // Random number generation error
+             Error_Handler();
+             }
+           }
+  */
+  // Initialize cryptographic library
+	if (cmox_initialize(NULL) != CMOX_INIT_SUCCESS) {
+		Error_Handler();
+	}
+	cmox_ecc_construct(&ecc_ctx, CMOX_ECC256_MATH_FUNCS, working_buffer,
+			sizeof(working_buffer));
 
-  // Verify API returned value
-    if (retval_mcuKeys != CMOX_ECC_SUCCESS)
-    {
-      Error_Handler();
-    }
-    // Cleanup context
-    cmox_ecc_cleanup(&ecc_ctx);
+	/*
+	 * for CMOX_ECC_BPP512T1_LOWMEM curve use
+	 *    cmox_ecc_construct(&ecc_ctx, CMOX_ECC128MULT_MATH_FUNCS, working_buffer, sizeof(working_buffer));
+	 */
+	//startTick = HAL_GetTick();
+	//generate public and private key for mcu
+	retval_mcuKeys = cmox_ecdsa_keyGen(&ecc_ctx, CMOX_ECC_SECP256K1_LOWMEM,	// [in] SECP256K1 curve
+			//CMOX_ECC_BPP512T1_LOWMEM,								// [in] BRAINPOOL T-512 curve
+			Random, sizeof(Random),	// [in] for testing - comment this line when you want to use random number using RNG
+			//(uint8_t *)Computed_Random, sizeof(Computed_Random),	// [in] uncomment this line to use random number
+			(uint8_t*) privateKey, CMOX_ECC_SECP256K1_PRIVKEY_LEN,// [out] mcu private key
+			(uint8_t*) pubKey, CMOX_ECC_SECP256K1_PUBKEY_LEN);// [out] mcu public key
+	//endTick = HAL_GetTick();
+	//elapsedTime = endTick - startTick;
 
-    //startTick = HAL_GetTick();
-    cmox_ecc_construct(&ecc_ctx, CMOX_ECC256_MATH_FUNCS, working_buffer, sizeof(working_buffer));
-    /*
-     * for CMOX_ECC_BPP512T1_LOWMEM curve use
-     *    cmox_ecc_construct(&ecc_ctx, CMOX_ECC128MULT_MATH_FUNCS, working_buffer, sizeof(working_buffer));
-     */
-    //generate shared secret using mcu's private key and remote public key
-    retval_sharedSecret = cmox_ecdh(&ecc_ctx,                                       // [in] ECC context
-						  //CMOX_ECC_BPP512T1_LOWMEM,								// [in] BRAINPOOL T-512 curve
-		  	  	  	  	  CMOX_ECC_SECP256K1_LOWMEM,                         		// [in] SECP256K1 ECC curve selected
-						  (uint8_t *)privateKey, sizeof(privateKey),         		// [in] mcu private key
-						  //mcuPrivateKey, sizeof(mcuPrivateKey),
-						  sPublicKey, sizeof(sPublicKey),							// [in] server public key
-						  sharedSecret, &computed_size);      						// [out] data buffer to receive shared secret
-  //endTick = HAL_GetTick();
-  //elapsedTime = endTick - startTick;
-  // Verify API returned value
-    if (retval_sharedSecret != CMOX_ECC_SUCCESS)
-    {
-      Error_Handler();
-    }
+	// Verify API returned value
+	if (retval_mcuKeys != CMOX_ECC_SUCCESS) {
+		Error_Handler();
+	}
+	// Cleanup context
+	cmox_ecc_cleanup(&ecc_ctx);
 
-    // Verify generated data size is the expected one
-    if (computed_size != sizeof(sharedSecret))
-    {
-      Error_Handler();
-    }
-    // cleanup context
-    cmox_ecc_cleanup(&ecc_ctx);
+	//startTick = HAL_GetTick();
+	cmox_ecc_construct(&ecc_ctx, CMOX_ECC256_MATH_FUNCS, working_buffer,
+			sizeof(working_buffer));
+	/*
+	 * for CMOX_ECC_BPP512T1_LOWMEM curve use
+	 *    cmox_ecc_construct(&ecc_ctx, CMOX_ECC128MULT_MATH_FUNCS, working_buffer, sizeof(working_buffer));
+	 */
+	//generate shared secret using mcu's private key and remote public key
+	retval_sharedSecret = cmox_ecdh(&ecc_ctx,                // [in] ECC context
+			//CMOX_ECC_BPP512T1_LOWMEM,								// [in] BRAINPOOL T-512 curve
+			CMOX_ECC_SECP256K1_LOWMEM,      // [in] SECP256K1 ECC curve selected
+			(uint8_t*) privateKey, sizeof(privateKey),   // [in] mcu private key
+			//mcuPrivateKey, sizeof(mcuPrivateKey),
+			sPublicKey, sizeof(sPublicKey),			// [in] server public key
+			sharedSecret, &computed_size); // [out] data buffer to receive shared secret
+	//endTick = HAL_GetTick();
+	//elapsedTime = endTick - startTick;
+	// Verify API returned value
+	if (retval_sharedSecret != CMOX_ECC_SUCCESS) {
+		Error_Handler();
+	}
+	// Verify generated data size is the expected one
+	if (computed_size != sizeof(sharedSecret)) {
+		Error_Handler();
+	}
+	// cleanup context
+	cmox_ecc_cleanup(&ecc_ctx);
+	if (cmox_initialize(NULL) != CMOX_INIT_SUCCESS) {
+		Error_Handler();
+	}
+	//startTick = HAL_GetTick();
+	//AES CBC ENCRYPTION for 256-bit key length
+	retval_cipher = cmox_cipher_encrypt(CMOX_AESFAST_CBC_ENC_ALGO, // [in] AES CBC algorithm
+			Plaintext, sizeof(Plaintext),           // [in] plaintext to encrypt
+			sharedSecret, CMOX_CIPHER_256_BIT_KEY, 		// [in] AES key to use
+			IV, sizeof(IV),                        // [in] initialization vector
+			(uint8_t*) Computed_Ciphertext, &computed_cipher); // [out] data buffer to receive generated ciphertext
+	//Verify API returned value
+	if (retval_cipher != CMOX_CIPHER_SUCCESS) {
+		Error_Handler();
+	}
+	//endTick = HAL_GetTick();
+	//elapsedTime = endTick - startTick;
 
-    if (cmox_initialize(NULL) != CMOX_INIT_SUCCESS)
-    {
-      Error_Handler();
-    }
-    //startTick = HAL_GetTick();
-    //AES CBC ENCRYPTION for 256-bit key length
-    retval_cipher = cmox_cipher_encrypt(CMOX_AESFAST_CBC_ENC_ALGO,                  	// [in] AES CBC algorithm
-    									Plaintext, sizeof(Plaintext),           		// [in] plaintext to encrypt
-										sharedSecret, CMOX_CIPHER_256_BIT_KEY, 			// [in] AES key to use
-										IV, sizeof(IV),                         		// [in] initialization vector
-        								(uint8_t *)Computed_Ciphertext, &computed_cipher); // [out] data buffer to receive generated ciphertext
-    //Verify API returned value
-    if (retval_cipher != CMOX_CIPHER_SUCCESS)
-    {
-    	Error_Handler();
-    }
-    //endTick = HAL_GetTick();
-    //elapsedTime = endTick - startTick;
+	//No more need of cryptographic services, finalize cryptographic library
+	if (cmox_finalize(NULL) != CMOX_INIT_SUCCESS) {
+		Error_Handler();
+	}
+	glob_status = PASSED;
 
-    //No more need of cryptographic services, finalize cryptographic library
-   if (cmox_finalize(NULL) != CMOX_INIT_SUCCESS)
-   {
-	 Error_Handler();
-   }
-   glob_status = PASSED;
+	char pubKeyStr[sizeof(pubKey) * 2 + 1]; // double the size for two hexadecimal digits per byte + 1 for null terminator
+	convert_to_hex_string(pubKey, sizeof(pubKey), pubKeyStr);
 
-
-	 char pubKeyStr[sizeof(pubKey) * 2 + 1]; // double the size for two hexadecimal digits per byte + 1 for null terminator
-	 convert_to_hex_string(pubKey, sizeof(pubKey), pubKeyStr);
-
-	 /*
+	/*
 	 char test_str[]="1ebde72699eb046423784bd9f329a59ab485555dd83d45c7dc0c51928d159ac7f21e21d6b598e1e1e1719943b793f7f76886fb78f87879c32b2bce64309237ff";
 	 uint8_t test_str_array[sizeof(test_str) / 2];
 	 size_t test_str_arr_length = 0;
 	 convert_to_byte_array(test_str, test_str_array, &test_str_arr_length);
 
 	 printf("converted array: ");
-		for (size_t i = 0; i < test_str_arr_length; i++) {
-			printf("0x%02x ", test_str_array[i]);
+	 for (size_t i = 0; i < test_str_arr_length; i++) {
+	 printf("0x%02x ", test_str_array[i]);
+	 }
+	 printf("\n");
+	 */
+
+	/*
+	 //AES CBC DECRYPTION for 256-bit key length
+	 retval_cipher = cmox_cipher_decrypt(CMOX_AESFAST_CBC_DEC_ALGO,                  				// [in] AES CBC algorithm
+	 Computed_Ciphertext, sizeof(Computed_Ciphertext),       // [in] ciphertext to decrypt
+	 sharedSecret, CMOX_CIPHER_256_BIT_KEY, 					// [in] AES key to use
+	 IV, sizeof(IV),                         				// [in] initialization vector
+	 (uint8_t *)Computed_Plaintext, &computed_cipher); 		// [out] data buffer to receive decrypted plaintext
+	 //Verify API returned value
+	 if (retval_cipher != CMOX_CIPHER_SUCCESS)
+	 {
+	 Error_Handler();
+	 }
+	 */
+	wait_ms(1000);
+	HAL_GPIO_WritePin(WIFI_MODEM_RESET_PORT, WIFI_MODEM_RESET_PIN, GPIO_PIN_SET);
+	wait_ms(1000);
+	at_interface__initialize();
+
+	int count = 0;
+	static const char test_string_aws[] =
+			"\"{\"status\":\"c0f958353c5af040db056247f4d7dd9f\",\"gps\":{\"latitude\":\"test\",\"longitude\":\"10f4678d15f185427e2911791d751b8f\"},\"batteryLevel\":\"ca74ca2f55cbe7f92789a704ff686c2f\",\"temperature\":\"ca74ca2f55cbe7f92789a704ff686c2f\"}\"";
+
+	char data_string[100];
+	char private_key_str[MAX_PRIVATE_KEY_LEN] = {0};
+	//  static const char TEST_STRING[] = "\"{\"GPS\":[37.3387,-121.8853],\"Battery\":45%,\"Temperature\": 21.1C}\"";
+	bool got_shared_secret = false;
+  /* USER CODE END 2 */
+
+  /* Infinite loop */
+  /* USER CODE BEGIN WHILE */
+	while (1) {
+		/* USER CODE END WHILE */
+		/* USER CODE BEGIN 3 */
+		bool ms_elapsed = false;
+		if (timer__ms_elapsed(DRIVER_TIMER2))
+		{
+			ms_elapsed = true;
+			mqtt__process();
+			if (++count == 1000)
+			{
+				count = 0;
+				//at_interface__publish_test();
+				if (got_shared_secret)
+				{
+					drone_status_t data = {0};
+					get_drone_status(&data);
+					get_drone_status_string(&data, data_string);
+					// encrypt string
+					mqtt__publish(test_string_aws, strlen(test_string_aws));
+				}
+				else
+				{
+					if (mqtt__get_sub_message(private_key_str, MAX_PRIVATE_KEY_LEN) != 0)
+					{
+						got_shared_secret = true;
+					}
+				}
+			}
+			at_interface__process(ms_elapsed);
 		}
-		printf("\n");
-	  */
+	}
+  /* USER CODE END 3 */
+}
 
-/*
-	   //AES CBC DECRYPTION for 256-bit key length
-	   retval_cipher = cmox_cipher_decrypt(CMOX_AESFAST_CBC_DEC_ALGO,                  				// [in] AES CBC algorithm
-											Computed_Ciphertext, sizeof(Computed_Ciphertext),       // [in] ciphertext to decrypt
-											sharedSecret, CMOX_CIPHER_256_BIT_KEY, 					// [in] AES key to use
-											IV, sizeof(IV),                         				// [in] initialization vector
-											(uint8_t *)Computed_Plaintext, &computed_cipher); 		// [out] data buffer to receive decrypted plaintext
-	   	   //Verify API returned value
-		  if (retval_cipher != CMOX_CIPHER_SUCCESS)
-		  {
-			Error_Handler();
-		  }
-*/
-           wait_ms(1000);
-           HAL_GPIO_WritePin(WIFI_MODEM_RESET_PORT, WIFI_MODEM_RESET_PIN, GPIO_PIN_SET);
-           wait_ms(1000);
-           at_interface__initialize();
-
-           int count = 0;
-             static const char test_string_aws[] = "\"{\"status\":\"c0f958353c5af040db056247f4d7dd9f\",\"gps\":{\"latitude\":\"test\",\"longitude\":\"10f4678d15f185427e2911791d751b8f\"},\"batteryLevel\":\"ca74ca2f55cbe7f92789a704ff686c2f\",\"temperature\":\"ca74ca2f55cbe7f92789a704ff686c2f\"}\"";
-
-             char data_string[100];
-             char private_key_str[MAX_PRIVATE_KEY_LEN] = {0};
-           //  static const char TEST_STRING[] = "\"{\"GPS\":[37.3387,-121.8853],\"Battery\":45%,\"Temperature\": 21.1C}\"";
-             bool got_shared_secret = false;
-             while (1)
-             {
-           	  bool ms_elapsed = false;
-           	  if(timer__ms_elapsed(DRIVER_TIMER2))
-           	  {
-           		  ms_elapsed = true;
-           		  mqtt__process();
-           		  if(++count == 1000)
-           		  {
-
-           			  count = 0;
-           //			  at_interface__publish_test();
-           			  if(got_shared_secret)
-           			  {
-						  drone_status_t data = {0};
-						  get_drone_status(&data);
-						  get_drone_status_string(&data, data_string);
-						  // encrypt string
-						  mqtt__publish(test_string_aws, strlen(test_string_aws));
-           			  }
-           			  else
-           			  {
-           				  if(mqtt__get_sub_message(private_key_str, MAX_PRIVATE_KEY_LEN) != 0)
-           				  {
-           					got_shared_secret = true;
-           				  }
-           			  }
-           		  }
-           	  }
-           	  at_interface__process(ms_elapsed);
-              /* USER CODE END WHILE */
-
-              /* USER CODE BEGIN 3 */
-            }
-            /* USER CODE END 3 */
-          }
 /**
   * @brief System Clock Configuration
   * @retval None
@@ -433,20 +459,21 @@ void SystemClock_Config(void)
 
   /** Configure the main internal regulator output voltage
   */
-  HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1_BOOST);
+  HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1);
 
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
-  RCC_OscInitStruct.PLL.PLLM = RCC_PLLM_DIV4;
-  RCC_OscInitStruct.PLL.PLLN = 85;
+  RCC_OscInitStruct.PLL.PLLM = RCC_PLLM_DIV1;
+  RCC_OscInitStruct.PLL.PLLN = 8;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
-  RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV2;
+  RCC_OscInitStruct.PLL.PLLQ = RCC_PLLQ_DIV4;
   RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
@@ -462,11 +489,221 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
   {
     Error_Handler();
   }
+  HAL_RCC_MCOConfig(RCC_MCO_PG10, RCC_MCO1SOURCE_HSI, RCC_MCODIV_1);
 }
+
+/**
+  * @brief I2C1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C1_Init(void)
+{
+
+  /* USER CODE BEGIN I2C1_Init 0 */
+
+  /* USER CODE END I2C1_Init 0 */
+
+  /* USER CODE BEGIN I2C1_Init 1 */
+
+  /* USER CODE END I2C1_Init 1 */
+  hi2c1.Instance = I2C1;
+  hi2c1.Init.Timing = 0x10707DBC;
+  hi2c1.Init.OwnAddress1 = 0;
+  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c1.Init.OwnAddress2 = 0;
+  hi2c1.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
+  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Analogue filter
+  */
+  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c1, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Digital filter
+  */
+  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c1, 0) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C1_Init 2 */
+
+  /* USER CODE END I2C1_Init 2 */
+
+}
+
+/**
+  * @brief RNG Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_RNG_Init(void)
+{
+
+  /* USER CODE BEGIN RNG_Init 0 */
+
+  /* USER CODE END RNG_Init 0 */
+
+  /* USER CODE BEGIN RNG_Init 1 */
+
+  /* USER CODE END RNG_Init 1 */
+  hrng.Instance = RNG;
+  hrng.Init.ClockErrorDetection = RNG_CED_ENABLE;
+  if (HAL_RNG_Init(&hrng) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN RNG_Init 2 */
+
+  /* USER CODE END RNG_Init 2 */
+
+}
+
+/**
+  * @brief RTC Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_RTC_Init(void)
+{
+
+  /* USER CODE BEGIN RTC_Init 0 */
+
+  /* USER CODE END RTC_Init 0 */
+
+  /* USER CODE BEGIN RTC_Init 1 */
+
+  /* USER CODE END RTC_Init 1 */
+
+  /** Initialize RTC Only
+  */
+  hrtc.Instance = RTC;
+  hrtc.Init.HourFormat = RTC_HOURFORMAT_24;
+  hrtc.Init.AsynchPrediv = 127;
+  hrtc.Init.SynchPrediv = 255;
+  hrtc.Init.OutPut = RTC_OUTPUT_DISABLE;
+  hrtc.Init.OutPutRemap = RTC_OUTPUT_REMAP_NONE;
+  hrtc.Init.OutPutPolarity = RTC_OUTPUT_POLARITY_HIGH;
+  hrtc.Init.OutPutType = RTC_OUTPUT_TYPE_OPENDRAIN;
+  hrtc.Init.OutPutPullUp = RTC_OUTPUT_PULLUP_NONE;
+  if (HAL_RTC_Init(&hrtc) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN RTC_Init 2 */
+
+  /* USER CODE END RTC_Init 2 */
+
+}
+
+/**
+  * @brief USART1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART1_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART1_Init 0 */
+
+  /* USER CODE END USART1_Init 0 */
+
+  /* USER CODE BEGIN USART1_Init 1 */
+
+  /* USER CODE END USART1_Init 1 */
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 9600;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart1.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+  huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetTxFifoThreshold(&huart1, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetRxFifoThreshold(&huart1, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_DisableFifoMode(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART1_Init 2 */
+
+  /* USER CODE END USART1_Init 2 */
+
+}
+
+/**
+  * @brief USART2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART2_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART2_Init 0 */
+
+  /* USER CODE END USART2_Init 0 */
+
+  /* USER CODE BEGIN USART2_Init 1 */
+
+  /* USER CODE END USART2_Init 1 */
+  huart2.Instance = USART2;
+  huart2.Init.BaudRate = 115200;
+  huart2.Init.WordLength = UART_WORDLENGTH_8B;
+  huart2.Init.StopBits = UART_STOPBITS_1;
+  huart2.Init.Parity = UART_PARITY_NONE;
+  huart2.Init.Mode = UART_MODE_TX_RX;
+  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart2.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart2.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+  huart2.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetTxFifoThreshold(&huart2, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetRxFifoThreshold(&huart2, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_DisableFifoMode(&huart2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART2_Init 2 */
+
+  /* USER CODE END USART2_Init 2 */
+
+}
+
 /**
   * @brief GPIO Initialization Function
   * @param None
@@ -475,13 +712,24 @@ void SystemClock_Config(void)
 static void MX_GPIO_Init(void)
 {
   GPIO_InitTypeDef GPIO_InitStruct = {0};
+/* USER CODE BEGIN MX_GPIO_Init_1 */
+/* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOG_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : PG10 */
+  GPIO_InitStruct.Pin = GPIO_PIN_10;
+  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  GPIO_InitStruct.Alternate = GPIO_AF0_MCO;
+  HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
 
   /*Configure GPIO pin : LD2_Pin */
   GPIO_InitStruct.Pin = LD2_Pin;
@@ -490,6 +738,7 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
+/* USER CODE BEGIN MX_GPIO_Init_2 */
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(WIFI_MODEM_RESET_PORT, WIFI_MODEM_RESET_PIN, GPIO_PIN_RESET);
 
@@ -535,8 +784,10 @@ static void MX_GPIO_Init(void)
 //  GPIOA->OSPEEDR &= ~(3 << 6);
 //  GPIOA->OSPEEDR |= (3 << 6); // very high frequency
 //  GPIOA->AFR[1] |= (7 << 12);
+/* USER CODE END MX_GPIO_Init_2 */
 }
 
+/* USER CODE BEGIN 4 */
 static void process_cli(void)
 {
 	static uint16_t index = 0;
@@ -548,9 +799,6 @@ static void process_cli(void)
 	  uart__put(DRIVER_UART1, &c, 1);
 	}
 }
-
-/* USER CODE BEGIN 4 */
-
 /* USER CODE END 4 */
 
 /**

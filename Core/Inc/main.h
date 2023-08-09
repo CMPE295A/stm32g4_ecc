@@ -71,11 +71,10 @@ void Error_Handler(void);
 #define T_SWO_GPIO_Port GPIOB
 #define LD2_Pin GPIO_PIN_8
 #define LD2_GPIO_Port GPIOB
-#define WIFI_MODEM_RESET_PORT GPIOA
-#define WIFI_MODEM_RESET_PIN GPIO_PIN_2
 
 /* USER CODE BEGIN Private defines */
-
+#define WIFI_MODEM_RESET_PORT GPIOA
+#define WIFI_MODEM_RESET_PIN GPIO_PIN_2
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

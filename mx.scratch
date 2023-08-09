@@ -3,16 +3,16 @@
   <FileVersion>3.0</FileVersion>
   <Workspace>
     <WorkspaceType>Single-project</WorkspaceType>
-    <WorkspacePath>/Users/visvasuthar/Desktop/MSSE/Spring2023/stm32g4/</WorkspacePath>
+    <WorkspacePath>C:\Users\jasdi\OneDrive\Desktop\drone\</WorkspacePath>
     <underRoot>true</underRoot>
     <TrustZone>0</TrustZone>
-    <HAL_Driver>/Users/visvasuthar/STM32Cube/Repository//STM32Cube_FW_G4_V1.5.1</HAL_Driver>
+    <HAL_Driver>C:\Users\jasdi\STM32Cube\Repository\STM32Cube_FW_G4_V1.5.1</HAL_Driver>
     <CMSIS>Drivers/CMSIS</CMSIS>
     <Toolchain>STM32CubeIDE</Toolchain>
-    <IocFile>stm32g4.ioc</IocFile>
+    <IocFile>stm32g4_ecc.ioc</IocFile>
     <Project>
-      <ProjectName>stm32g4</ProjectName>
-      <ProjectNature>CPP</ProjectNature>
+      <ProjectName>stm32g4_ecc</ProjectName>
+      <ProjectNature>C</ProjectNature>
       <Secure/>
       <filestoremove/>
       <sourceEntriesToRemove>
@@ -20,7 +20,7 @@
       </sourceEntriesToRemove>
       <configs>
         <config>
-          <name>stm32g4</name>
+          <name>stm32g4_ecc</name>
           <mainSourceRepo>Core</mainSourceRepo>
           <sourceStructure>Advanced</sourceStructure>
           <device>STM32G431KBTx</device>
@@ -30,7 +30,7 @@
             <memory access="xrw" name="RAM" size="32" start="0x20000000"/>
             <memory access="rx" name="FLASH" size="128" start="0x8000000"/>
           </memories>
-          <startup>/Users/visvasuthar/STM32Cube/Repository/STM32Cube_FW_G4_V1.5.1/Drivers/CMSIS/Device\ST\STM32G4xx\Source\Templates\gcc\startup_stm32g431xx.s</startup>
+          <startup>C:\Users\jasdi\STM32Cube\Repository\STM32Cube_FW_G4_V1.5.1\Drivers\CMSIS\Device\ST\STM32G4xx\Source\Templates\gcc\startup_stm32g431xx.s</startup>
           <LinkSettings>
             <LinkAdditionalLibs/>
           </LinkSettings>
@@ -50,11 +50,11 @@
           </Cdefines>
           <Ldefines/>
           <Cincludes>
-            <include>Core/Inc</include>
-            <include>Drivers/STM32G4xx_HAL_Driver/Inc</include>
-            <include>Drivers/STM32G4xx_HAL_Driver/Inc/Legacy</include>
-            <include>Drivers/CMSIS/Device/ST/STM32G4xx/Include</include>
-            <include>Drivers/CMSIS/Include</include>
+            <include>Core\Inc</include>
+            <include>Drivers\STM32G4xx_HAL_Driver\Inc</include>
+            <include>Drivers\STM32G4xx_HAL_Driver\Inc\Legacy</include>
+            <include>Drivers\CMSIS\Device\ST\STM32G4xx\Include</include>
+            <include>Drivers\CMSIS\Include</include>
           </Cincludes>
           <definestoremove>
             <Adefines/>
