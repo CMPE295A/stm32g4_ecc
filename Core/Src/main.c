@@ -169,7 +169,6 @@ static void MX_RNG_Init(void);
 static void MX_RTC_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_USART1_UART_Init(void);
-static void process_cli(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -400,7 +399,7 @@ int main(void)
 	wait_ms(1000);
 	HAL_GPIO_WritePin(WIFI_MODEM_RESET_PORT, WIFI_MODEM_RESET_PIN, GPIO_PIN_SET);
 	wait_ms(1000);
-	at_interface__initialize();
+//	at_interface__initialize();
 
 	int count = 0;
 	static const char test_string_aws[] =
@@ -410,13 +409,16 @@ int main(void)
 	char private_key_str[MAX_PRIVATE_KEY_LEN] = {0};
 	//  static const char TEST_STRING[] = "\"{\"GPS\":[37.3387,-121.8853],\"Battery\":45%,\"Temperature\": 21.1C}\"";
 	bool got_shared_secret = false;
+	char buf[64];
+    sensor_t sensor_data = {0};
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 	while (1) {
-		/* USER CODE END WHILE */
-		/* USER CODE BEGIN 3 */
+    /* USER CODE END WHILE */
+
+    /* USER CODE BEGIN 3 */
 		bool ms_elapsed = false;
 		if (timer__ms_elapsed(DRIVER_TIMER2))
 		{
@@ -426,11 +428,15 @@ int main(void)
 			{
 				count = 0;
 				//at_interface__publish_test();
+				sensor__get_accel(&sensor_data);
+				sensor__get_gyro(&sensor_data);
+				sprintf(buf, "horizontal: %.4f, vertical: %.4f, lateral: %.4f\r\n", sensor_data.horizontal, sensor_data.vertical, sensor_data.lateral);
+				HAL_UART_Transmit(&huart1, (uint8_t*)buf, strlen(buf), HAL_MAX_DELAY);
 				if (got_shared_secret)
 				{
 					drone_status_t data = {0};
-					get_drone_status(&data);
-					get_drone_status_string(&data, data_string);
+					get_drone_status(&sensor_data);
+					get_drone_status_string(&sensor_data, data_string);
 					// encrypt string
 					mqtt__publish(test_string_aws, strlen(test_string_aws));
 				}
@@ -444,6 +450,16 @@ int main(void)
 			}
 			at_interface__process(ms_elapsed);
 		}
+//		arm_ESC();
+//		if (speed < 28){
+//		for (speed = 0; speed <= 28; speed += 4) {
+//			timer_4__set_duty_cycle(speed);
+//			sprintf(buf, "Duty_cycle: %d\r\n", speed);
+//			HAL_UART_Transmit(&huart1, (uint8_t*)buf, strlen(buf), HAL_MAX_DELAY);
+//			HAL_Delay(2000);
+//			}
+//		}
+//		timer_4__set_duty_cycle(speed);
 	}
   /* USER CODE END 3 */
 }
@@ -624,7 +640,7 @@ static void MX_USART1_UART_Init(void)
 
   /* USER CODE END USART1_Init 1 */
   huart1.Instance = USART1;
-  huart1.Init.BaudRate = 9600;
+  huart1.Init.BaudRate = 115200;
   huart1.Init.WordLength = UART_WORDLENGTH_8B;
   huart1.Init.StopBits = UART_STOPBITS_1;
   huart1.Init.Parity = UART_PARITY_NONE;

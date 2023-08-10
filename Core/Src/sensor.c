@@ -111,10 +111,6 @@ void sensor__get_accel(sensor_t *sensor)
 //	horizontal = kalman_filter(horizontal);
 //	vertical = kalman_filter(vertical);
 //	lateral = kalman_filter(lateral);
-
-	char buf[64];
-	sprintf(buf, "horizontal: %.2f, vertical: %.2f, lateral: %.2f\r\n", sensor->horizontal, sensor->vertical, sensor->lateral);
-	HAL_UART_Transmit(&huart1, (uint8_t*)buf, strlen(buf), HAL_MAX_DELAY);
 }
 
 void sensor__get_gyro(sensor_t *sensor)
@@ -143,8 +139,4 @@ void sensor__get_gyro(sensor_t *sensor)
 //	roll = kalman_filter(roll);
 //	pitch = kalman_filter(pitch);
 //	yaw = kalman_filter(yaw);
-
-	char buf[64];
-	sprintf(buf, "roll: %.2f, pitch: %.2f, yaw: %.2f\r\n\n", sensor->roll, sensor->pitch, sensor->yaw);
-	HAL_UART_Transmit(&huart1, (uint8_t*)buf, strlen(buf), HAL_MAX_DELAY);
 }
