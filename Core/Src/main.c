@@ -399,7 +399,7 @@ int main(void)
 	wait_ms(1000);
 	HAL_GPIO_WritePin(WIFI_MODEM_RESET_PORT, WIFI_MODEM_RESET_PIN, GPIO_PIN_SET);
 	wait_ms(1000);
-//	at_interface__initialize();
+	at_interface__initialize();
 
 	int count = 0;
 	static const char test_string_aws[] =
