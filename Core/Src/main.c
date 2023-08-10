@@ -170,7 +170,7 @@ static void MX_RTC_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
-
+static void process_cli(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -409,8 +409,8 @@ int main(void)
 	char private_key_str[MAX_PRIVATE_KEY_LEN] = {0};
 	//  static const char TEST_STRING[] = "\"{\"GPS\":[37.3387,-121.8853],\"Battery\":45%,\"Temperature\": 21.1C}\"";
 	bool got_shared_secret = false;
-	char buf[64];
-    sensor_t sensor_data = {0};
+	static char buf[64];
+    static sensor_t sensor_data = {0};
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -434,9 +434,9 @@ int main(void)
 				HAL_UART_Transmit(&huart1, (uint8_t*)buf, strlen(buf), HAL_MAX_DELAY);
 				if (got_shared_secret)
 				{
-					drone_status_t data = {0};
-					get_drone_status(&sensor_data);
-					get_drone_status_string(&sensor_data, data_string);
+//					drone_status_t data = {0};
+//					get_drone_status(&sensor_data);
+//					get_drone_status_string(&sensor_data, data_string);
 					// encrypt string
 					mqtt__publish(test_string_aws, strlen(test_string_aws));
 				}
