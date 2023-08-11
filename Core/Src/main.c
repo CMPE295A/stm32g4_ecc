@@ -201,7 +201,7 @@ void get_drone_status(drone_status_t *status)
 
 int get_drone_status_string(drone_status_t *status, char *str)
 {
-	//return sprintf(str, "\"{\"GPS\":[%.4f, %.4f],\"Battery\":%.1f%,\"Temperature\":%.1fC}\"", status->lat, status->lon, status->battery, status->temperature);
+	return sprintf(str, "\"{\"Accelerometer_X\":\"%.2f\",\"Battery\":\"%.1f%\",\"Temperature\":\"%.1fC\"}\"", sensor_data.horizontal, status->battery, status->temperature);
 }
 void convert_to_hex_string(const uint8_t *inputArray, size_t inputLength, char *outputString) {
     for (size_t i = 0; i < inputLength; i++) {
@@ -378,14 +378,14 @@ int main(void)
 				}
 				if (got_shared_secret)
 				{
-//					drone_status_t data = {0};
-//					get_drone_status(&sensor_data);
-//					get_drone_status_string(&sensor_data, data_string);
+					drone_status_t data = {0};
+					get_drone_status(&data);
+					get_drone_status_string(&data, data_string);
 					generate_sharedsecret(mcuPrivateKey, sizeof(mcuPrivateKey), (uint8_t *)private_key_str, sizeof(private_key_str),sharedSecret);
 					//convert_to_hex_string(sharedSecret, sizeof(sharedSecret), sharedSecretStr);
 					// encrypt string
 					//encrypt_data(sharedSecret,Plaintext, sizeof(Plaintext), cipherText);
-					mqtt__publish(test_string_aws, strlen(test_string_aws));
+					mqtt__publish(data_string, strlen(data_string));
 				}
 				else
 				{
