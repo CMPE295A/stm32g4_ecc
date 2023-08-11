@@ -14,13 +14,12 @@
 #define LINE_BUFFER_MAX 5
 #define LINE_MAX_LEN 512
 
-static const char DRONE_ID[] = "1";
+//static const char DRONE_ID[] = "1";
 static const char EMPTY_LINE[] = "\0";
 static const char AT_CMD_ECHO_OFF[] = "ATE0\r\n";
 static const char AT_CMD_TEST[] = "AT\r\n";
 static const char AT_CMD_MODE[] = "AT+CWMODE_CUR=1\r\n";
 static const char AT_CMD_LIST_AP[] = "AT+CWLAP\r\n";
-//static const char AT_CMD_SSID[] = "AT+CWJAP_CUR=\"MyBaloneysFirstName\",\"BernieLocke\",\"c8:9e:43:c3:88:26\"\r\n";
 static const char AT_CMD_SSID[] = "AT+CWJAP_CUR=\"scott_hotspot\",\"20jack23\"\r\n";
 static const char AT_CMD_DHCP[] = "AT+CWDHCP_CUR=1,1\r\n";
 static const char AT_CMD_RESTORE[]= "AT+RESTORE=1\r\n";
@@ -40,19 +39,24 @@ static const char AT_CMD_MQTT_PUBLISH_TEST[] = "AT+MQTTPUB=\"TESTING\"\r\n";
 static const char AT_CMD_MQTT_PUBLISH_PREFIX[] = "AT+MQTTPUB=";
 
 static const char AT_CMD_MQTT_TOPIC_STATUS_AWS[] = "AT+MQTTTOPIC=\"$aws/things/Microcontroller/shadow/name/shadow/update\",\"$aws/things/Microcontroller/shadow/name/shadow/update/accepted\"\r\n";
-static const char AT_RESPONSE_MQTT_SUB_TOPIC[] = "$aws/things/Microcontroller/shadow/name/shadow/update/accepted -> ";
+static const char AT_CMD_MQTT_TOPIC_KEY[] = "AT+MQTTTOPIC=\"mcu/publicKey\",\"server/publicKey\"\r\n";
+static const char AT_RESPONSE_MQTT_SUB_TOPIC_KEY[] = "server/publicKey -> ";
+static const char AT_RESPONSE_MQTT_SUB_TOPIC_DEFAULT[] = "$aws/things/Microcontroller/shadow/name/shadow/update/accepted -> ";
+static const char *TOPIC_SET_COMMANDS[NUM_MQTT_TOPICS] = {AT_CMD_MQTT_TOPIC_KEY, AT_CMD_MQTT_TOPIC_STATUS_AWS};
+static const char *SUB_STRINGS[NUM_MQTT_TOPICS] = {AT_RESPONSE_MQTT_SUB_TOPIC_KEY, AT_RESPONSE_MQTT_SUB_TOPIC_DEFAULT};
 static const char AT_CMD_MQTT_SETUP_AWS[] = "AT+MQTTSET=\"\",\"\",\"Microcontroller\",60\r\n";
 static const char AT_CMD_AWS_CONNECT[] = "AT+AWSCON=\"a3vvj2kk3rs3as-ats.iot.us-west-1.amazonaws.com\"\r\n";
+static const char AT_CMD_MQTT_DISCONNECT[] = "AT+MQTTDIS\r\n";
 
 static const char AT_CMD_CONNECT[] = "AT+CIPSTART=\"UDP\",\"192.168.73.160\",50103,50108,0\r\n";
 static const char AT_CMD_SEND_PREFIX[] = "AT+CIPSEND=\"";
 static const char AT_CMD_SEND_TEST[] = "AT+CIPSEND=12\r\n";
 
 static const char AT_RESPONSE_OK[] = "OK";
-static const char AT_RESPONSE_GOT_IP[] = "WIFI GOT IP";
-static const char AT_RESPONSE_SEND_OK[] = "SEND_OK";
+//static const char AT_RESPONSE_GOT_IP[] = "WIFI GOT IP";
+//static const char AT_RESPONSE_SEND_OK[] = "SEND_OK";
 static const char AT_RESPONSE_READY[] = "ready";
-static const char AT_RESPONSE_CLOSED[] = "CLOSED";
+static const char AT_RESPONSE_CLOSED[] = "CLOSE";
 static const char AT_RESPONSE_LINK_INVALID[] = "link is not valid";
 
 static const char AT_CMD_ENDING[] = "\r\n";
@@ -62,6 +66,7 @@ static const char TEST_STRING2[] = "HELLO WORLD2";
 
 static uint16_t state = AT_INTERFACE_INIT;
 static uint16_t last_state = AT_INTERFACE_INIT;
+static uint8_t current_topic;
 
 static void read(void);
 static bool line_is(const char *str);
@@ -78,7 +83,7 @@ static char *last_line = (char*)EMPTY_LINE;
 static char *next_to_last_line = (char*)EMPTY_LINE;
 static uint16_t next_line = 1;
 static uint16_t char_index = 0;
-static uint32_t send_count = 0;
+//static uint32_t send_count = 0;
 static bool ms_tick = 0;
 static bool start_transition = false;
 static uint32_t start_tick = 0;
@@ -92,6 +97,7 @@ bool at_interface__initialize(void)
 	bool initialized = uart__initialize(AT_MODEM_UART, 115200);
 	send_at_cmd(AT_CMD_RESTORE);
 	state = AT_INTERFACE_INIT;
+	current_topic = MQTT_TOPIC_KEY;
 	start_tick = HAL_GetTick();
 	return initialized;
 }
@@ -166,7 +172,7 @@ void at_interface__process(bool ms_elapsed)
 		break;
 
 	case AT_INTERFACE_MQTT_SET_TOPIC:
-		step(AT_RESPONSE_OK, AT_CMD_MQTT_SETUP_AWS, AT_INTERFACE_MQTT_SETUP);
+		step(AT_RESPONSE_OK, TOPIC_SET_COMMANDS[current_topic], AT_INTERFACE_MQTT_SETUP);
 		break;
 
 	case AT_INTERFACE_MQTT_SETUP:
@@ -188,7 +194,7 @@ void at_interface__process(bool ms_elapsed)
 			state = AT_INTERFACE_INIT;
 			at_interface__initialize();
 		}
-		else if(next_to_last_line_is(AT_RESPONSE_MQTT_SUB_TOPIC))
+		else if(next_to_last_line_is(SUB_STRINGS[current_topic]))
 		{
 			last_state = state;
 			state = AT_INTERFACE_GET_SHARED_SECRET;
@@ -218,9 +224,18 @@ void at_interface__process(bool ms_elapsed)
 	}
 }
 
-void at_interface_get_packet(char *packet, uint16_t size)
+bool at_interface__set_topic(uint8_t topic)
 {
-	// pull last packet from buffer
+	bool success = false;
+	if(topic < NUM_MQTT_TOPICS && state == AT_INTERFACE_NETWORK_UP)
+	{
+		current_topic = topic;
+		send_at_cmd(AT_CMD_MQTT_DISCONNECT);
+		last_state = state;
+		state = AT_INTERFACE_MQTT_DISCONNECT;
+		success = true;
+	}
+	return success;
 }
 
 void at_interface__publish_test(void)

@@ -7,12 +7,16 @@ enum
 {
 	MQTT_STATE_IDLE = 0,
 	MQTT_STATE_PUBLISH,
+	MQTT_STATE_CHANGE_TOPIC,
 
 	NUM_MQTT_STATES
 };
 
 static uint8_t state = MQTT_STATE_IDLE;
+static uint8_t topic = MQTT_TOPIC_KEY;
+static uint8_t new_topic = MQTT_TOPIC_KEY;
 static uint16_t pub_attempt = 0;
+static uint16_t topic_attempt = 0;
 static char pub_buffer[MAX_MQTT_PUB_BUFFER_BYTES] = {0};
 static char sub_buffer[MAX_MQTT_PUB_BUFFER_BYTES] = {0};
 
@@ -33,7 +37,23 @@ void mqtt__process(void)
 		}
 		break;
 	}
+
+	case MQTT_STATE_CHANGE_TOPIC:
+	{
+		bool success = at_interface__set_topic(new_topic);
+		if(success || topic_attempt++ > MQTT_PUBLISH_TIMEOUT_MS)
+		{
+			topic = new_topic;
+			state = MQTT_STATE_IDLE;
+			topic_attempt = 0;
+		}
 	}
+	}
+}
+
+uint8_t mqtt__get_current_topic(void)
+{
+	return topic;
 }
 
 bool mqtt__publish(char *message, uint16_t byte_length)
@@ -50,6 +70,18 @@ bool mqtt__publish(char *message, uint16_t byte_length)
 		}
 	}
 	return registered;
+}
+
+bool mqtt__change_topic(uint8_t proposed_new_topic)
+{
+	bool success = false;
+	if(state == MQTT_STATE_IDLE && proposed_new_topic < NUM_MQTT_TOPICS)
+	{
+		new_topic = proposed_new_topic;
+		state = MQTT_STATE_CHANGE_TOPIC;
+		success = true;
+	}
+	return success;
 }
 
 void mqtt__sub_set(char *message, uint16_t byte_length)

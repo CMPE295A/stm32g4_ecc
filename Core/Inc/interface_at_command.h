@@ -40,3 +40,4 @@ void at_interface__send_string(char *str);
 void at_interface__send_test_string(void);
 bool at_interface__publish_string(char *str);
 void at_interface__publish_test(void);
+bool at_interface__set_topic(uint8_t topic);

@@ -224,22 +224,22 @@ void convert_to_byte_array(const char *hexString, uint8_t *outputArray, size_t *
 static char buf[200];
 static void print_duty_cycle(void) {
 	snprintf(buf, sizeof(buf), "%s %i %s", "Duty Cycle: ",duty_cycle, "\r\n");
-	uart__put(DRIVER_UART1, (uint8_t *)buf, strlen(buf));
-	wait_ms(1000);
+//	uart__put(DRIVER_UART1, (uint8_t *)buf, strlen(buf));
+//	wait_ms(1000);
 }
 
 static void control_motors(void) {
 	for (; duty_cycle < duty_cycle_max; duty_cycle += duty_cycle_step) {
 //		timer_4__set_duty_cycle(duty_cycle);
 		timer_1__set_duty_cycle(duty_cycle);
-		HAL_Delay(3000);
+		// HAL_Delay(3000);
 	}
 	if (sensor_data.lateral < left_tilt) {
 //		timer_4__set_duty_cycle(duty_cycle_max + 2);
 		duty_cycle += 2;
 		timer_4__set_duty_cycle(duty_cycle);
-		HAL_Delay(500);
-		print_duty_cycle();
+		// HAL_Delay(500);
+//		print_duty_cycle();
 		duty_cycle -= 2;
 	}
 	else if (sensor_data.lateral > right_tilt) {
@@ -247,15 +247,15 @@ static void control_motors(void) {
 		duty_cycle += 2;
 //		timer_4__set_duty_cycle(duty_cycle);
 		timer_1__set_duty_cycle(duty_cycle);
-		HAL_Delay(500);
-		print_duty_cycle();
+		// HAL_Delay(500);
+//		print_duty_cycle();
 		duty_cycle -= 2;
 	}
 	else {
 		timer_4__set_duty_cycle(duty_cycle);
 		timer_1__set_duty_cycle(duty_cycle);
-		HAL_Delay(500);
-		print_duty_cycle();
+		// HAL_Delay(500);
+//		print_duty_cycle();
 	}
 }
 
@@ -392,13 +392,12 @@ int main(void)
 				}
 			}
 			at_interface__process(ms_elapsed);
+			control_motors();
 		}
 		char buffer[100];
-	    snprintf(buffer, sizeof(buffer), "%s %f %s", "Lateral: ",sensor_data.lateral, "\r\n");
-		uart__put(DRIVER_UART1, (uint8_t *)buffer, strlen(buffer));
-		wait_ms(1000);
-
-		control_motors();
+//	    snprintf(buffer, sizeof(buffer), "%s %f %s", "Lateral: ",sensor_data.lateral, "\r\n");
+//		uart__put(DRIVER_UART1, (uint8_t *)buffer, strlen(buffer));
+//		wait_ms(1000);
 	}
   /* USER CODE END 3 */
 }
