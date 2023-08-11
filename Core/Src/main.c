@@ -196,17 +196,16 @@ void convert_to_hex_string(const uint8_t *inputArray, size_t inputLength, char *
     size_t outputIndex = 0;
 
     for (size_t i = 0; i < inputLength; i++) {
-        // Append escape characters if necessary
         if (inputArray[i] == '\\' || inputArray[i] == '\"') {
-            outputString[outputIndex++] = '\\'; // Append backslash
+            outputString[outputIndex++] = '\\';
 
-            // Convert the special character to its hexadecimal representation
+            // convert the special character to its hexadecimal representation
             snprintf(&outputString[outputIndex], 3, "%02x", inputArray[i]);
-            outputIndex += 2; // Move the index to the next position after the hex characters
+            outputIndex += 2; // move the index to the next position after the hex characters
         } else {
-            // Convert the byte to its hexadecimal representation
+            // convert the byte to its hexadecimal representation
             snprintf(&outputString[outputIndex], 3, "%02x", inputArray[i]);
-            outputIndex += 2; // Move the index to the next position after the hex characters
+            outputIndex += 2; // move the index to the next position after the hex characters
         }
     }
 
@@ -275,12 +274,17 @@ int main(void)
 	  //decrypt_data(sharedSecret,cipherText, sizeof(cipherText), computedPlain);
 
 
+  	  //conversion of mcu public key in string format
+		size_t inputLength = sizeof(mcuPublicKey) / sizeof(mcuPublicKey[0]);
+		char mcuPublicKeyStr[300]; // Adjust the size as needed
+		convert_to_hex_string(mcuPublicKey, inputLength, mcuPublicKeyStr);
 
-	  	  size_t inputLength = sizeof(mcuPublicKey) / sizeof(mcuPublicKey[0]);
-	      char mcuPublicKeyStr[300]; // Adjust the size as needed
-
-	      convert_to_hex_string(mcuPublicKey, inputLength, mcuPublicKeyStr);
-
+		//appending mcuPublicKeyStr with escape characters
+		char mcuPublicKeyStrSend[300] = "\"";
+         int len = strlen(mcuPublicKeyStr);
+         memcpy(&mcuPublicKeyStrSend[1], mcuPublicKeyStr, len);
+         mcuPublicKeyStrSend[len + 1] = '\"';
+         mcuPublicKeyStrSend[len + 2] = '\0';
 		 //char mcuPublicKeyStr[sizeof(mcuPublicKey) * 2 + 1]; // double the size for two hexadecimal digits per byte + 1 for null terminator
 		 //convert_to_hex_string(mcuPublicKey, sizeof(mcuPublicKey), mcuPublicKeyStr);
 
@@ -310,12 +314,7 @@ int main(void)
               mcuPublicKeyStrSend[len + 2] = '\0'; // Null-terminate the string
 */
 
-             char mcuPublicKeyStrSend[600] = "\""; // Increase the size if necessary
 
-              int len = strlen(mcuPublicKeyStr);
-              memcpy(&mcuPublicKeyStrSend[1], mcuPublicKeyStr, len);
-              mcuPublicKeyStrSend[len + 1] = '\"';
-              mcuPublicKeyStrSend[len + 2] = '\0'; // Null-terminate the modified string
 
            //  static const char TEST_STRING[] = "\"{\"GPS\":[37.3387,-121.8853],\"Battery\":45%,\"Temperature\": 21.1C}\"";
              bool got_shared_secret = false;
