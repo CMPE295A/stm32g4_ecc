@@ -12,7 +12,7 @@
 #define NUM_SAMPLES 5
 
 I2C_HandleTypeDef hi2c1;
-UART_HandleTypeDef huart1;
+//UART_HandleTypeDef huart1;
 
 HAL_StatusTypeDef status = HAL_OK;
 
