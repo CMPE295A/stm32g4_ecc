@@ -230,15 +230,15 @@ static void print_duty_cycle(void) {
 
 static void control_motors(void) {
 	for (; duty_cycle < duty_cycle_max; duty_cycle += duty_cycle_step) {
-//		timer_4__set_duty_cycle(duty_cycle);
+		timer_4__set_duty_cycle(duty_cycle);
 		timer_1__set_duty_cycle(duty_cycle);
-		HAL_Delay(3000);
+//		HAL_Delay(3000);
 	}
 	if (sensor_data.lateral < left_tilt) {
 //		timer_4__set_duty_cycle(duty_cycle_max + 2);
 		duty_cycle += 2;
 		timer_4__set_duty_cycle(duty_cycle);
-		HAL_Delay(500);
+//		HAL_Delay(500);
 		print_duty_cycle();
 		duty_cycle -= 2;
 	}
@@ -247,14 +247,14 @@ static void control_motors(void) {
 		duty_cycle += 2;
 //		timer_4__set_duty_cycle(duty_cycle);
 		timer_1__set_duty_cycle(duty_cycle);
-		HAL_Delay(500);
+//		HAL_Delay(500);
 		print_duty_cycle();
 		duty_cycle -= 2;
 	}
 	else {
 		timer_4__set_duty_cycle(duty_cycle);
 		timer_1__set_duty_cycle(duty_cycle);
-		HAL_Delay(500);
+//		HAL_Delay(500);
 		print_duty_cycle();
 	}
 }
@@ -327,7 +327,11 @@ int main(void)
 	HAL_GPIO_WritePin(WIFI_MODEM_RESET_PORT, WIFI_MODEM_RESET_PIN, GPIO_PIN_SET);
 	wait_ms(1000);
 	at_interface__initialize();
-//	uart__initialize(DRIVER_UART1, 115200);
+	for (; duty_cycle < duty_cycle_max; duty_cycle += duty_cycle_step) {
+		timer_4__set_duty_cycle(duty_cycle);
+		timer_1__set_duty_cycle(duty_cycle);
+		HAL_Delay(4000);
+	}
 
 	int count = 0;
 	static const char test_string_aws[] =
@@ -393,12 +397,22 @@ int main(void)
 			}
 			at_interface__process(ms_elapsed);
 		}
-		char buffer[100];
-	    snprintf(buffer, sizeof(buffer), "%s %f %s", "Lateral: ",sensor_data.lateral, "\r\n");
-		uart__put(DRIVER_UART1, (uint8_t *)buffer, strlen(buffer));
-		wait_ms(1000);
-
-		control_motors();
+//		timer_4__set_duty_cycle(duty_cycle);
+//	    timer_1__set_duty_cycle(duty_cycle);
+		if (sensor_data.lateral < left_tilt) {
+			duty_cycle += 2;
+			timer_4__set_duty_cycle(duty_cycle);
+			duty_cycle -= 2;
+		}
+		else if (sensor_data.lateral > right_tilt) {
+			duty_cycle += 2;
+			timer_1__set_duty_cycle(duty_cycle);
+			duty_cycle -= 2;
+		}
+		else {
+			timer_4__set_duty_cycle(duty_cycle);
+			timer_1__set_duty_cycle(duty_cycle);
+		}
 	}
   /* USER CODE END 3 */
 }
