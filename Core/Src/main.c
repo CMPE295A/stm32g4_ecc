@@ -179,6 +179,8 @@ static sensor_t sensor_data = {0};
 const static uint8_t duty_cycle_max = 25;
 const static uint8_t duty_cycle_step = 5;
 static uint8_t duty_cycle = 0;
+const static uint8_t left_tilt = -0.20;
+const static uint8_t right_tilt = -0.20;
 
 void wait_ms(int ms_wait_threshold)
 {
@@ -232,7 +234,7 @@ static void control_motors(void) {
 		timer_1__set_duty_cycle(duty_cycle);
 		HAL_Delay(3000);
 	}
-	if (sensor_data.lateral < -0.20) {     // drone tilts left
+	if (sensor_data.lateral < left_tilt) {
 //		timer_4__set_duty_cycle(duty_cycle_max + 2);
 		duty_cycle += 2;
 		timer_4__set_duty_cycle(duty_cycle);
@@ -240,7 +242,7 @@ static void control_motors(void) {
 		print_duty_cycle();
 		duty_cycle -= 2;
 	}
-	else if (sensor_data.lateral > +0.20) { // drone tilts right
+	else if (sensor_data.lateral > right_tilt) {
 //		timer_1__set_duty_cycle(duty_cycle_max + 2);
 		duty_cycle += 2;
 //		timer_4__set_duty_cycle(duty_cycle);
@@ -255,7 +257,6 @@ static void control_motors(void) {
 		HAL_Delay(500);
 		print_duty_cycle();
 	}
-
 }
 
 /* USER CODE END 0 */
@@ -392,6 +393,11 @@ int main(void)
 			}
 			at_interface__process(ms_elapsed);
 		}
+		char buffer[100];
+	    snprintf(buffer, sizeof(buffer), "%s %f %s", "Lateral: ",sensor_data.lateral, "\r\n");
+		uart__put(DRIVER_UART1, (uint8_t *)buffer, strlen(buffer));
+		wait_ms(1000);
+
 		control_motors();
 	}
   /* USER CODE END 3 */
