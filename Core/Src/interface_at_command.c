@@ -21,7 +21,7 @@ static const char AT_CMD_TEST[] = "AT\r\n";
 static const char AT_CMD_MODE[] = "AT+CWMODE_CUR=1\r\n";
 static const char AT_CMD_LIST_AP[] = "AT+CWLAP\r\n";
 //static const char AT_CMD_SSID[] = "AT+CWJAP_CUR=\"MyBaloneysFirstName\",\"BernieLocke\",\"c8:9e:43:c3:88:26\"\r\n";
-static const char AT_CMD_SSID[] = "AT+CWJAP_CUR=\"scott_hotspot\",\"20jack23\"\r\n";
+static const char AT_CMD_SSID[] = "AT+CWJAP_CUR=\"spiderman\",\"spiderman\"\r\n";
 static const char AT_CMD_DHCP[] = "AT+CWDHCP_CUR=1,1\r\n";
 static const char AT_CMD_RESTORE[]= "AT+RESTORE=1\r\n";
 static const char AT_CMD_SSL_CONFIG[] = "AT+CIPSSLCCONF=2\r\n";
@@ -39,8 +39,8 @@ static const char AT_CMD_MQTT_CONNECT[] = "AT+MQTTCON=0,\"192.168.1.12\",1883\r\
 static const char AT_CMD_MQTT_PUBLISH_TEST[] = "AT+MQTTPUB=\"TESTING\"\r\n";
 static const char AT_CMD_MQTT_PUBLISH_PREFIX[] = "AT+MQTTPUB=";
 
-static const char AT_CMD_MQTT_TOPIC_STATUS_AWS[] = "AT+MQTTTOPIC=\"$aws/things/Microcontroller/shadow/name/shadow/update\",\"$aws/things/Microcontroller/shadow/name/shadow/update/accepted\"\r\n";
-static const char AT_RESPONSE_MQTT_SUB_TOPIC[] = "$aws/things/Microcontroller/shadow/name/shadow/update/accepted -> ";
+static const char AT_CMD_MQTT_TOPIC_STATUS_AWS[] = "AT+MQTTTOPIC=\"mcu/publicKey\",\"server/publicKey\"\r\n";
+static const char AT_RESPONSE_MQTT_SUB_TOPIC[] = "server/publicKey -> ";
 static const char AT_CMD_MQTT_SETUP_AWS[] = "AT+MQTTSET=\"\",\"\",\"Microcontroller\",60\r\n";
 static const char AT_CMD_AWS_CONNECT[] = "AT+AWSCON=\"a3vvj2kk3rs3as-ats.iot.us-west-1.amazonaws.com\"\r\n";
 

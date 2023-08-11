@@ -10,7 +10,7 @@
 #define PWR_MGMT_1_REG 0x6B
 #define WHO_AM_I_REG 0x75
 #define NUM_SAMPLES 5
-
+/*
 I2C_HandleTypeDef hi2c1;
 UART_HandleTypeDef huart1;
 
@@ -140,3 +140,4 @@ void sensor__get_gyro(sensor_t *sensor)
 //	pitch = kalman_filter(pitch);
 //	yaw = kalman_filter(yaw);
 }
+*/
