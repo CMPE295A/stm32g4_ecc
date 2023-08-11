@@ -105,12 +105,12 @@ void at_interface__process(bool ms_elapsed)
 	switch(state)
 	{
 	case AT_INTERFACE_INIT:
-		step(AT_RESPONSE_READY, AT_CMD_TEST, AT_INTERFACE_TEST);
+		step(AT_RESPONSE_READY, AT_CMD_ECHO_OFF, AT_INTERFACE_ECHO_OFF);
 		break;
 
-//	case AT_INTERFACE_ECHO_OFF:
-//		step(AT_RESPONSE_OK, AT_CMD_TEST, AT_INTERFACE_TEST);
-//		break;
+	case AT_INTERFACE_ECHO_OFF:
+		step(AT_RESPONSE_OK, AT_CMD_TEST, AT_INTERFACE_TEST);
+		break;
 
 	case AT_INTERFACE_TEST:
 		step(AT_RESPONSE_OK, AT_CMD_MODE, AT_INTERFACE_MODE);
@@ -129,7 +129,7 @@ void at_interface__process(bool ms_elapsed)
 //		break;
 
 	case AT_INTERFACE_SSID:
-		step(AT_RESPONSE_GOT_IP, AT_CMD_SSL_CONFIG, AT_INTERFACE_SSL_CONFIG);
+		step(AT_RESPONSE_OK, AT_CMD_SSL_CONFIG, AT_INTERFACE_SSL_CONFIG);
 		break;
 
 	case AT_INTERFACE_SSL_CONFIG:

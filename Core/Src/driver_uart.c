@@ -183,6 +183,7 @@ void uart__interrupt_handler(uint8_t id)
 		// Write to TDR to clear fifo
 		tx_interrupt_handler(id);
 	}
+	uart[id].regs->ICR |= 0x00123BFF;
 }
 
 void USART1_IRQHandler(void)
