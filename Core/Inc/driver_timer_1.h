@@ -16,3 +16,8 @@ void timer_1__set_duty_cycle(float duty_cycle_in_percent);
 
 void timer_1__set_frequency(float pwm_frequency_Hz);
 
+void timer_4__set_duty_cycle(float duty_cycle_in_percent);
+
+void timer_4__set_frequency(float pwm_frequency_Hz);
+
+void TIM1_IRQHandler(void);

@@ -29,6 +29,7 @@
 #include "interface_mqtt.h"
 #include "sensor.h"
 #include "generate_keys.h"
+#include "driver_timer_1.h"
 
 /* USER CODE END Includes */
 
@@ -68,6 +69,9 @@ extern I2C_HandleTypeDef hi2c1;
 //RNG_HandleTypeDef hrng;
 
 RTC_HandleTypeDef hrtc;
+
+TIM_HandleTypeDef htim1;
+TIM_HandleTypeDef htim4;
 
 /* USER CODE BEGIN PV */
 
@@ -154,6 +158,8 @@ static void MX_GPIO_Init(void);
 static void MX_RNG_Init(void);
 static void MX_RTC_Init(void);
 static void MX_I2C1_Init(void);
+static void MX_TIM1_Init(void);
+static void MX_TIM4_Init(void);
 /* USER CODE BEGIN PFP */
 static void process_cli(void);
 /* USER CODE END PFP */
@@ -168,6 +174,11 @@ typedef struct{
 }drone_status_t;
 
 static const drone_status_t test_data = {.lat=37.3387, .lon=-121.8853, .battery=45.0, .temperature=21.1};
+
+static sensor_t sensor_data = {0};
+const static uint8_t duty_cycle_max = 25;
+const static uint8_t duty_cycle_step = 5;
+static uint8_t duty_cycle = 0;
 
 void wait_ms(int ms_wait_threshold)
 {
@@ -207,6 +218,24 @@ void convert_to_byte_array(const char *hexString, uint8_t *outputArray, size_t *
     for (size_t i = 0; i < arrayLength; i++) {
         sscanf(&hexString[i * 2], "%2hhx", &outputArray[i]);
     }
+}
+
+static void control_motors(void) {
+	timer_4__set_duty_cycle(0);
+	//		HAL_Delay(2000);
+	//		if (speed < 25){
+				for (duty_cycle = 0; duty_cycle <= duty_cycle_max; duty_cycle += duty_cycle_step) {
+					timer_4__set_duty_cycle(duty_cycle);
+	//				sprintf(buf, "Duty_cycle: %d\r\n", speed);
+	//				HAL_UART_Transmit(&huart1, (uint8_t*)buf, strlen(buf), HAL_MAX_DELAY);
+					HAL_Delay(2000);
+				}
+	//		}
+	//		timer_4__set_duty_cycle(28);
+		    HAL_Delay(3000);
+	//			  set_speed(0);
+		    timer_4__set_duty_cycle(0);
+			HAL_Delay(3000);
 }
 /* USER CODE END 0 */
 
@@ -251,8 +280,12 @@ int main(void)
   MX_RNG_Init();
   MX_RTC_Init();
   MX_I2C1_Init();
+  MX_TIM1_Init();
+  MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
   timer__initialize(DRIVER_TIMER2, TIMER_MS_PER_SECOND);
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+  HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
   generate_keypair(mcuPrivateKey1, mcuPublicKey1);
   //generate_sharedsecret(mcuPrivateKey, sizeof(mcuPrivateKey), sPublicKey, sizeof(sPublicKey),sharedSecret);
   //encrypt_data(sharedSecret,Plaintext, sizeof(Plaintext), cipherText);
@@ -291,8 +324,6 @@ int main(void)
 	*/
 
 	bool got_shared_secret = false;
-	static char buf[64];
-    static sensor_t sensor_data = {0};
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -303,6 +334,7 @@ int main(void)
     /* USER CODE BEGIN 3 */
 		bool ms_elapsed = false;
 		//generate_keypair(mcuPrivateKey, mcuPublicKey);
+
 		if (timer__ms_elapsed(DRIVER_TIMER2))
 		{
 			ms_elapsed = true;
@@ -314,8 +346,9 @@ int main(void)
 				//at_interface__publish_test();
 				sensor__get_accel(&sensor_data);
 				sensor__get_gyro(&sensor_data);
-//				sprintf(buf, "horizontal: %.4f, vertical: %.4f, lateral: %.4f\r\n", sensor_data.horizontal, sensor_data.vertical, sensor_data.lateral);
-//				HAL_UART_Transmit(&huart1, (uint8_t*)buf, strlen(buf), HAL_MAX_DELAY);
+				if(hal_status != HAL_OK) {
+					Error_Handler();
+				}
 				if (got_shared_secret)
 				{
 //					drone_status_t data = {0};
@@ -337,16 +370,7 @@ int main(void)
 			}
 			at_interface__process(ms_elapsed);
 		}
-//		arm_ESC();
-//		if (speed < 28){
-//		for (speed = 0; speed <= 28; speed += 4) {
-//			timer_4__set_duty_cycle(speed);
-//			sprintf(buf, "Duty_cycle: %d\r\n", speed);
-//			HAL_UART_Transmit(&huart1, (uint8_t*)buf, strlen(buf), HAL_MAX_DELAY);
-//			HAL_Delay(2000);
-//			}
-//		}
-//		timer_4__set_duty_cycle(speed);
+		control_motors();
 	}
   /* USER CODE END 3 */
 }
@@ -505,6 +529,147 @@ static void MX_RTC_Init(void)
 }
 
 /**
+  * @brief TIM1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM1_Init(void)
+{
+
+  /* USER CODE BEGIN TIM1_Init 0 */
+
+  /* USER CODE END TIM1_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+  TIM_BreakDeadTimeConfigTypeDef sBreakDeadTimeConfig = {0};
+
+  /* USER CODE BEGIN TIM1_Init 1 */
+
+  /* USER CODE END TIM1_Init 1 */
+  htim1.Instance = TIM1;
+  htim1.Init.Prescaler = 0;
+  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim1.Init.Period = 225;
+  htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim1.Init.RepetitionCounter = 25;
+  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_Init(&htim1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterOutputTrigger2 = TIM_TRGO2_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
+  sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
+  if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_DISABLE;
+  sBreakDeadTimeConfig.OffStateIDLEMode = TIM_OSSI_DISABLE;
+  sBreakDeadTimeConfig.LockLevel = TIM_LOCKLEVEL_OFF;
+  sBreakDeadTimeConfig.DeadTime = 0;
+  sBreakDeadTimeConfig.BreakState = TIM_BREAK_DISABLE;
+  sBreakDeadTimeConfig.BreakPolarity = TIM_BREAKPOLARITY_HIGH;
+  sBreakDeadTimeConfig.BreakFilter = 0;
+  sBreakDeadTimeConfig.BreakAFMode = TIM_BREAK_AFMODE_INPUT;
+  sBreakDeadTimeConfig.Break2State = TIM_BREAK2_DISABLE;
+  sBreakDeadTimeConfig.Break2Polarity = TIM_BREAK2POLARITY_HIGH;
+  sBreakDeadTimeConfig.Break2Filter = 0;
+  sBreakDeadTimeConfig.Break2AFMode = TIM_BREAK_AFMODE_INPUT;
+  sBreakDeadTimeConfig.AutomaticOutput = TIM_AUTOMATICOUTPUT_DISABLE;
+  if (HAL_TIMEx_ConfigBreakDeadTime(&htim1, &sBreakDeadTimeConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM1_Init 2 */
+
+  /* USER CODE END TIM1_Init 2 */
+  HAL_TIM_MspPostInit(&htim1);
+
+}
+
+/**
+  * @brief TIM4 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM4_Init(void)
+{
+
+  /* USER CODE BEGIN TIM4_Init 0 */
+
+  /* USER CODE END TIM4_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+
+  /* USER CODE BEGIN TIM4_Init 1 */
+
+  /* USER CODE END TIM4_Init 1 */
+  htim4.Instance = TIM4;
+  htim4.Init.Prescaler = 12;
+  htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim4.Init.Period = 60000;
+  htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim4, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_Init(&htim4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 195;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM4_Init 2 */
+
+  /* USER CODE END TIM4_Init 2 */
+  HAL_TIM_MspPostInit(&htim4);
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -632,3 +797,4 @@ void assert_failed(uint8_t *file, uint32_t line)
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
+

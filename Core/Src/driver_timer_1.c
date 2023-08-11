@@ -91,6 +91,17 @@ void timer_1__set_frequency(float pwm_frequency_Hz) {
 	TIM1->ARR = counts_per_cycle;
 }
 
+void timer_4__set_duty_cycle(float duty_cycle_in_percent){
+	uint32_t counts_per_cycle = TIM4->ARR + 1;
+	uint32_t pulse_width = (duty_cycle_in_percent * counts_per_cycle) / 100;
+	TIM4->CCR1 = pulse_width;
+}
+
+void timer_4__set_frequency(float pwm_frequency_Hz) {
+	uint32_t counts_per_cycle = (timer_clock_frequency_Hz / pwm_frequency_Hz) - 1;
+	TIM4->ARR = counts_per_cycle;
+}
+
 void TIM1_IRQHandler(void) {
 	// Handle the timer interrupt here
 	TIM1->SR &= ~TIM_SR_UIF;
