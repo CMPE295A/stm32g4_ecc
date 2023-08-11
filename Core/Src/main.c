@@ -24,6 +24,7 @@
 #include "interface_at_command.h"
 #include <string.h>
 #include "interface_mqtt.h"
+#include "generate_keys.h"
 
 #define MAX_PRIVATE_KEY_LEN 256
 
@@ -51,11 +52,12 @@ HAL_StatusTypeDef hal_status = HAL_OK;
  /* USER CODE BEGIN PV */
 
  UART_HandleTypeDef huart2;
-
+/*
 const uint8_t IV[] =
  {
-   0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f};
-
+   0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f
+ };
+*/
 uint8_t Plaintext[] =
  {
    0x6b, 0xc1, 0xbe, 0xe2, 0x2e, 0x40, 0x9f, 0x96, 0xe9, 0x3d, 0x7e, 0x11, 0x73, 0x93, 0x17, 0x2a,
@@ -63,13 +65,13 @@ uint8_t Plaintext[] =
    0x30, 0xc8, 0x1c, 0x46, 0xa3, 0x5c, 0xe4, 0x11, 0xe5, 0xfb, 0xc1, 0x19, 0x1a, 0x0a, 0x52, 0xef,
    0xf6, 0x9f, 0x24, 0x45, 0xdf, 0x4f, 0x9b, 0x17, 0xad, 0x2b, 0x41, 0x7b, 0xe6, 0x6c, 0x37, 0x10
  };
-
+/*
 const uint8_t Random[] =
  {
    0x7d, 0x7d, 0xc5, 0xf7, 0x1e, 0xb2, 0x9d, 0xda, 0xf8, 0x0d, 0x62, 0x14, 0x63, 0x2e, 0xea, 0xe0,
    0x3d, 0x90, 0x58, 0xaf, 0x1f, 0xb6, 0xd2, 0x2e, 0xd8, 0x0b, 0xad, 0xb6, 0x2b, 0xc1, 0xa5, 0x34
  };
-
+*/
 /*
  * efc93803bd60c2be2a864409a289373126cc6554fa1f6c01f096dbf98b810abf
  */
@@ -136,7 +138,7 @@ const uint8_t mcuPrivateKey[]={
  uint8_t Computed_Ciphertext[64];
  uint8_t Computed_Plaintext[64];
 // RNG peripheral handle
-RNG_HandleTypeDef hrng;
+//RNG_HandleTypeDef hrng;
  /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -182,12 +184,43 @@ int get_drone_status_string(drone_status_t *status, char *str)
 {
 	//return sprintf(str, "\"{\"GPS\":[%.4f, %.4f],\"Battery\":%.1f%,\"Temperature\":%.1fC}\"", status->lat, status->lon, status->battery, status->temperature);
 }
+/*
 void convert_to_hex_string(const uint8_t *inputArray, size_t inputLength, char *outputString) {
     for (size_t i = 0; i < inputLength; i++) {
         snprintf(&outputString[i * 2], 3, "%02x", inputArray[i]);
     }
     outputString[inputLength * 2] = '\0'; // null-terminate the string
 }
+*/
+void convert_to_hex_string(const uint8_t *inputArray, size_t inputLength, char *outputString) {
+    size_t outputIndex = 0;
+
+    for (size_t i = 0; i < inputLength; i++) {
+        // Append escape characters if necessary
+        if (inputArray[i] == '\\' || inputArray[i] == '\"') {
+            outputString[outputIndex++] = '\\'; // Append backslash
+
+            // Convert the special character to its hexadecimal representation
+            snprintf(&outputString[outputIndex], 3, "%02x", inputArray[i]);
+            outputIndex += 2; // Move the index to the next position after the hex characters
+        } else {
+            // Convert the byte to its hexadecimal representation
+            snprintf(&outputString[outputIndex], 3, "%02x", inputArray[i]);
+            outputIndex += 2; // Move the index to the next position after the hex characters
+        }
+    }
+
+    // Null-terminate the string
+    outputString[outputIndex] = '\0';
+}
+void hexToUint8Array(const char *hex, uint8_t *output, size_t outputSize) {
+    size_t hexLength = strlen(hex);
+    size_t arraySize = outputSize / 2;
+
+    for (size_t i = 0; i < arraySize; i++) {
+        sscanf(&hex[i * 2], "%2hhx", &output[i]);
+    }
+}/*
 void convert_to_byte_array(const char *hexString, uint8_t *outputArray, size_t *outputLength) {
     size_t inputLength = strlen(hexString);
     if (inputLength % 2 != 0) {
@@ -200,20 +233,22 @@ void convert_to_byte_array(const char *hexString, uint8_t *outputArray, size_t *
         sscanf(&hexString[i * 2], "%2hhx", &outputArray[i]);
     }
 }
+*/
 
 int main(void)
 {
 	 /* USER CODE BEGIN 1 */
-	  cmox_ecc_retval_t retval_sharedSecret; //return value for cmox_ecdh
-	  size_t computed_size;
-	  cmox_ecc_retval_t retval_mcuKeys;	//return value for cmox_ecdsa_keyGen
-	  cmox_cipher_retval_t retval_cipher;	//return value for cmox_cipher_encrypt
-	  size_t computed_cipher;	//Computed_Ciphertex and Computed_Plaintext
 	  //uint32_t startTick = 0;
 	  //uint32_t endTick = 0;
 	  //uint32_t elapsedTime = 0;
 	  /* Fault check verification variable */
 	  uint32_t fault_check = CMOX_ECC_AUTH_FAIL;
+
+	  uint8_t mcuPrivateKey1[CMOX_ECC_SECP256K1_PRIVKEY_LEN];
+	  	uint8_t mcuPublicKey1[CMOX_ECC_SECP256K1_PUBKEY_LEN];
+	  	uint8_t sharedSecret1[CMOX_ECC_SECP256K1_SECRET_LEN];
+	  	uint8_t cipherText[64];
+	  	uint8_t computedPlain[64];
 	  /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -234,146 +269,28 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+	  //generate_keypair(mcuPrivateKey1, mcuPublicKey1);
+	  //generate_sharedsecret(mcuPrivateKey, sizeof(mcuPrivateKey), sPublicKey, sizeof(sPublicKey),sharedSecret);
+	  //encrypt_data(sharedSecret,Plaintext, sizeof(Plaintext), cipherText);
+	  //decrypt_data(sharedSecret,cipherText, sizeof(cipherText), computedPlain);
+
+
+
+	  	  size_t inputLength = sizeof(mcuPublicKey) / sizeof(mcuPublicKey[0]);
+	      char mcuPublicKeyStr[300]; // Adjust the size as needed
+
+	      convert_to_hex_string(mcuPublicKey, inputLength, mcuPublicKeyStr);
+
+		 //char mcuPublicKeyStr[sizeof(mcuPublicKey) * 2 + 1]; // double the size for two hexadecimal digits per byte + 1 for null terminator
+		 //convert_to_hex_string(mcuPublicKey, sizeof(mcuPublicKey), mcuPublicKeyStr);
+
+  	  const char *hex="1ebde72699eb046423784bd9f329a59ab485555dd83d45c7dc0c51928d159ac7f21e21d6b598e1e1e1719943b793f7f76886fb78f87879c32b2bce64309237ff";
+  	  uint8_t h[64];
+
+      hexToUint8Array(hex, h, sizeof(h));
 
   timer__initialize(DRIVER_TIMER2, TIMER_MS_PER_SECOND);
 
-  hrng.Instance = RNG;
-  hrng.Init.ClockErrorDetection = RNG_CED_ENABLE;
-  if (HAL_RNG_Init(&hrng) != HAL_OK)
-  {
-    Error_Handler();
-  }
-/*
- //Uncomment to use random number in cmox_ecdsa_keyGen
- //Generate random number to use Computed_Random in cmox_ecdsa_keyGen function
-
-  for (uint32_t i = 0; i < sizeof(Computed_Random) / sizeof(uint32_t); i++)
-         {
-           if (HAL_RNG_GenerateRandomNumber(&hrng, &Computed_Random[i]) != HAL_OK)
-           {
-             // Random number generation error
-           Error_Handler();
-           }
-         }
-*/
-  // Initialize cryptographic library
-  if (cmox_initialize(NULL) != CMOX_INIT_SUCCESS)
-  {
-    Error_Handler();
-  }
-  cmox_ecc_construct(&ecc_ctx, CMOX_ECC256_MATH_FUNCS, working_buffer, sizeof(working_buffer));
-
-  /*
-   * for CMOX_ECC_BPP512T1_LOWMEM curve use
-   *    cmox_ecc_construct(&ecc_ctx, CMOX_ECC128MULT_MATH_FUNCS, working_buffer, sizeof(working_buffer));
-   */
-  //startTick = HAL_GetTick();
-
-  //generate public and private key for mcu
-  retval_mcuKeys=cmox_ecdsa_keyGen(&ecc_ctx,
-		  CMOX_ECC_SECP256K1_LOWMEM,								// [in] SECP256K1 curve
-		  //CMOX_ECC_BPP512T1_LOWMEM,								// [in] BRAINPOOL T-512 curve
-		  Random, sizeof(Random),									// [in] for testing - comment this line when you want to use random number using RNG
-		  //(uint8_t *)Computed_Random, sizeof(Computed_Random),	// [in] uncomment this line to use random number
-		  (uint8_t*)privateKey, CMOX_ECC_SECP256K1_PRIVKEY_LEN,		// [out] mcu private key
-		  (uint8_t*)pubKey, CMOX_ECC_SECP256K1_PUBKEY_LEN);			// [out] mcu public key
-  //endTick = HAL_GetTick();
-  //elapsedTime = endTick - startTick;
-
-  // Verify API returned value
-    if (retval_mcuKeys != CMOX_ECC_SUCCESS)
-    {
-      Error_Handler();
-    }
-    // Cleanup context
-    cmox_ecc_cleanup(&ecc_ctx);
-
-    //startTick = HAL_GetTick();
-    cmox_ecc_construct(&ecc_ctx, CMOX_ECC256_MATH_FUNCS, working_buffer, sizeof(working_buffer));
-    /*
-     * for CMOX_ECC_BPP512T1_LOWMEM curve use
-     *    cmox_ecc_construct(&ecc_ctx, CMOX_ECC128MULT_MATH_FUNCS, working_buffer, sizeof(working_buffer));
-     */
-    //generate shared secret using mcu's private key and remote public key
-    retval_sharedSecret = cmox_ecdh(&ecc_ctx,                                       // [in] ECC context
-						  //CMOX_ECC_BPP512T1_LOWMEM,								// [in] BRAINPOOL T-512 curve
-		  	  	  	  	  CMOX_ECC_SECP256K1_LOWMEM,                         		// [in] SECP256K1 ECC curve selected
-						  (uint8_t *)privateKey, sizeof(privateKey),         		// [in] mcu private key
-						  //mcuPrivateKey, sizeof(mcuPrivateKey),
-						  sPublicKey, sizeof(sPublicKey),							// [in] server public key
-						  sharedSecret, &computed_size);      						// [out] data buffer to receive shared secret
-  //endTick = HAL_GetTick();
-  //elapsedTime = endTick - startTick;
-  // Verify API returned value
-    if (retval_sharedSecret != CMOX_ECC_SUCCESS)
-    {
-      Error_Handler();
-    }
-
-    // Verify generated data size is the expected one
-    if (computed_size != sizeof(sharedSecret))
-    {
-      Error_Handler();
-    }
-    // cleanup context
-    cmox_ecc_cleanup(&ecc_ctx);
-
-    if (cmox_initialize(NULL) != CMOX_INIT_SUCCESS)
-    {
-      Error_Handler();
-    }
-    //startTick = HAL_GetTick();
-    //AES CBC ENCRYPTION for 256-bit key length
-    retval_cipher = cmox_cipher_encrypt(CMOX_AESFAST_CBC_ENC_ALGO,                  	// [in] AES CBC algorithm
-    									Plaintext, sizeof(Plaintext),           		// [in] plaintext to encrypt
-										sharedSecret, CMOX_CIPHER_256_BIT_KEY, 			// [in] AES key to use
-										IV, sizeof(IV),                         		// [in] initialization vector
-        								(uint8_t *)Computed_Ciphertext, &computed_cipher); // [out] data buffer to receive generated ciphertext
-    //Verify API returned value
-    if (retval_cipher != CMOX_CIPHER_SUCCESS)
-    {
-    	Error_Handler();
-    }
-    //endTick = HAL_GetTick();
-    //elapsedTime = endTick - startTick;
-
-    //No more need of cryptographic services, finalize cryptographic library
-   if (cmox_finalize(NULL) != CMOX_INIT_SUCCESS)
-   {
-	 Error_Handler();
-   }
-   glob_status = PASSED;
-
-
-	 char pubKeyStr[sizeof(pubKey) * 2 + 1]; // double the size for two hexadecimal digits per byte + 1 for null terminator
-	 convert_to_hex_string(pubKey, sizeof(pubKey), pubKeyStr);
-
-	 /*
-	 char test_str[]="1ebde72699eb046423784bd9f329a59ab485555dd83d45c7dc0c51928d159ac7f21e21d6b598e1e1e1719943b793f7f76886fb78f87879c32b2bce64309237ff";
-	 uint8_t test_str_array[sizeof(test_str) / 2];
-	 size_t test_str_arr_length = 0;
-	 convert_to_byte_array(test_str, test_str_array, &test_str_arr_length);
-
-	 printf("converted array: ");
-		for (size_t i = 0; i < test_str_arr_length; i++) {
-			printf("0x%02x ", test_str_array[i]);
-		}
-		printf("\n");
-	  */
-
-/*
-	   //AES CBC DECRYPTION for 256-bit key length
-	   retval_cipher = cmox_cipher_decrypt(CMOX_AESFAST_CBC_DEC_ALGO,                  				// [in] AES CBC algorithm
-											Computed_Ciphertext, sizeof(Computed_Ciphertext),       // [in] ciphertext to decrypt
-											sharedSecret, CMOX_CIPHER_256_BIT_KEY, 					// [in] AES key to use
-											IV, sizeof(IV),                         				// [in] initialization vector
-											(uint8_t *)Computed_Plaintext, &computed_cipher); 		// [out] data buffer to receive decrypted plaintext
-	   	   //Verify API returned value
-		  if (retval_cipher != CMOX_CIPHER_SUCCESS)
-		  {
-			Error_Handler();
-		  }
-*/
            wait_ms(1000);
            HAL_GPIO_WritePin(WIFI_MODEM_RESET_PORT, WIFI_MODEM_RESET_PIN, GPIO_PIN_SET);
            wait_ms(1000);
@@ -384,11 +301,28 @@ int main(void)
 
              char data_string[100];
              char private_key_str[MAX_PRIVATE_KEY_LEN] = {0};
+				//char sharedSecretStr[CMOX_ECC_SECP256K1_SECRET_LEN * 2 + 1]; // double the size for two hexadecimal digits per byte + 1 for null terminator
+/*
+             char mcuPublicKeyStrSend[300]="\"";
+              int len=strlen(mcuPublicKeyStr);
+              memcpy(&mcuPublicKeyStrSend[1], mcuPublicKeyStr, len);
+              mcuPublicKeyStrSend[len + 1] = '\"';
+              mcuPublicKeyStrSend[len + 2] = '\0'; // Null-terminate the string
+*/
+
+             char mcuPublicKeyStrSend[600] = "\""; // Increase the size if necessary
+
+              int len = strlen(mcuPublicKeyStr);
+              memcpy(&mcuPublicKeyStrSend[1], mcuPublicKeyStr, len);
+              mcuPublicKeyStrSend[len + 1] = '\"';
+              mcuPublicKeyStrSend[len + 2] = '\0'; // Null-terminate the modified string
+
            //  static const char TEST_STRING[] = "\"{\"GPS\":[37.3387,-121.8853],\"Battery\":45%,\"Temperature\": 21.1C}\"";
              bool got_shared_secret = false;
              while (1)
              {
            	  bool ms_elapsed = false;
+          	  //generate_keypair(mcuPrivateKey, mcuPublicKey);
            	  if(timer__ms_elapsed(DRIVER_TIMER2))
            	  {
            		  ms_elapsed = true;
@@ -398,13 +332,22 @@ int main(void)
 
            			  count = 0;
            //			  at_interface__publish_test();
+					  //mqtt__publish(mcuPublicKey, sizeof(mcuPublicKey));
+
            			  if(got_shared_secret)
            			  {
-						  drone_status_t data = {0};
+           				generate_sharedsecret(mcuPrivateKey, sizeof(mcuPrivateKey), (uint8_t *)private_key_str, sizeof(private_key_str),sharedSecret);
+
+           				//convert_to_hex_string(sharedSecret, sizeof(sharedSecret), sharedSecretStr);
+           				  drone_status_t data = {0};
 						  get_drone_status(&data);
 						  get_drone_status_string(&data, data_string);
 						  // encrypt string
-						  mqtt__publish(test_string_aws, strlen(test_string_aws));
+						  //encrypt_data(sharedSecret,Plaintext, sizeof(Plaintext), cipherText);
+						  //mqtt__publish(test_string_aws, strlen(test_string_aws));
+
+						  //mqtt__publish(mcuPublicKeyStrSend, strlen(mcuPublicKeyStrSend));
+						  mqtt__publish(mcuPublicKeyStrSend, strlen(mcuPublicKeyStrSend));
            			  }
            			  else
            			  {
