@@ -219,24 +219,45 @@ void convert_to_byte_array(const char *hexString, uint8_t *outputArray, size_t *
         sscanf(&hexString[i * 2], "%2hhx", &outputArray[i]);
     }
 }
+static char buf[200];
+static void print_duty_cycle(void) {
+	snprintf(buf, sizeof(buf), "%s %i %s", "Duty Cycle: ",duty_cycle, "\r\n");
+	uart__put(DRIVER_UART1, (uint8_t *)buf, strlen(buf));
+	wait_ms(1000);
+}
 
 static void control_motors(void) {
-	timer_4__set_duty_cycle(0);
-	//		HAL_Delay(2000);
-	//		if (speed < 25){
-				for (duty_cycle = 0; duty_cycle <= duty_cycle_max; duty_cycle += duty_cycle_step) {
-					timer_4__set_duty_cycle(duty_cycle);
-	//				sprintf(buf, "Duty_cycle: %d\r\n", speed);
-	//				HAL_UART_Transmit(&huart1, (uint8_t*)buf, strlen(buf), HAL_MAX_DELAY);
-					HAL_Delay(2000);
-				}
-	//		}
-	//		timer_4__set_duty_cycle(28);
-		    HAL_Delay(3000);
-	//			  set_speed(0);
-		    timer_4__set_duty_cycle(0);
-			HAL_Delay(3000);
+	for (; duty_cycle < duty_cycle_max; duty_cycle += duty_cycle_step) {
+//		timer_4__set_duty_cycle(duty_cycle);
+		timer_1__set_duty_cycle(duty_cycle);
+		HAL_Delay(3000);
+	}
+	if (sensor_data.lateral < -0.20) {     // drone tilts left
+//		timer_4__set_duty_cycle(duty_cycle_max + 2);
+		duty_cycle += 2;
+		timer_4__set_duty_cycle(duty_cycle);
+		HAL_Delay(500);
+		print_duty_cycle();
+		duty_cycle -= 2;
+	}
+	else if (sensor_data.lateral > +0.20) { // drone tilts right
+//		timer_1__set_duty_cycle(duty_cycle_max + 2);
+		duty_cycle += 2;
+//		timer_4__set_duty_cycle(duty_cycle);
+		timer_1__set_duty_cycle(duty_cycle);
+		HAL_Delay(500);
+		print_duty_cycle();
+		duty_cycle -= 2;
+	}
+	else {
+		timer_4__set_duty_cycle(duty_cycle);
+		timer_1__set_duty_cycle(duty_cycle);
+		HAL_Delay(500);
+		print_duty_cycle();
+	}
+
 }
+
 /* USER CODE END 0 */
 
 /**
@@ -305,6 +326,7 @@ int main(void)
 	HAL_GPIO_WritePin(WIFI_MODEM_RESET_PORT, WIFI_MODEM_RESET_PIN, GPIO_PIN_SET);
 	wait_ms(1000);
 	at_interface__initialize();
+//	uart__initialize(DRIVER_UART1, 115200);
 
 	int count = 0;
 	static const char test_string_aws[] =
@@ -549,9 +571,9 @@ static void MX_TIM1_Init(void)
 
   /* USER CODE END TIM1_Init 1 */
   htim1.Instance = TIM1;
-  htim1.Init.Prescaler = 0;
+  htim1.Init.Prescaler = 12;
   htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 225;
+  htim1.Init.Period = 60000;
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim1.Init.RepetitionCounter = 25;
   htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
@@ -576,7 +598,7 @@ static void MX_TIM1_Init(void)
     Error_Handler();
   }
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 0;
+  sConfigOC.Pulse = 195;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
