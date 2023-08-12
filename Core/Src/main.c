@@ -203,11 +203,33 @@ int get_drone_status_string(drone_status_t *status, char *str)
 {
 	return sprintf(str, "\"{\"Accelerometer_X\":\"%.2f\",\"Battery\":\"%.1f%\",\"Temperature\":\"%.1fC\"}\"", sensor_data.horizontal, status->battery, status->temperature);
 }
+/*
 void convert_to_hex_string(const uint8_t *inputArray, size_t inputLength, char *outputString) {
     for (size_t i = 0; i < inputLength; i++) {
         snprintf(&outputString[i * 2], 3, "%02x", inputArray[i]);
     }
     outputString[inputLength * 2] = '\0'; // null-terminate the string
+}
+*/
+void convert_to_hex_string(const uint8_t *inputArray, size_t inputLength, char *outputString) {
+    size_t outputIndex = 0;
+
+    for (size_t i = 0; i < inputLength; i++) {
+        if (inputArray[i] == '\\' || inputArray[i] == '\"') {
+            outputString[outputIndex++] = '\\';
+
+            // convert the special character to its hexadecimal representation
+            snprintf(&outputString[outputIndex], 3, "%02x", inputArray[i]);
+            outputIndex += 2; // move the index to the next position after the hex characters
+        } else {
+            // convert the byte to its hexadecimal representation
+            snprintf(&outputString[outputIndex], 3, "%02x", inputArray[i]);
+            outputIndex += 2; // move the index to the next position after the hex characters
+        }
+    }
+
+    // Null-terminate the string
+    outputString[outputIndex] = '\0';
 }
 void convert_to_byte_array(const char *hexString, uint8_t *outputArray, size_t *outputLength) {
     size_t inputLength = strlen(hexString);
@@ -313,15 +335,26 @@ int main(void)
   //encrypt_data(sharedSecret,Plaintext, sizeof(Plaintext), cipherText);
   //decrypt_data(sharedSecret,cipherText, sizeof(cipherText), computedPlain);
 
-	 char mcuPublicKeyStr[sizeof(mcuPublicKey) * 2 + 1]; // double the size for two hexadecimal digits per byte + 1 for null terminator
-	 convert_to_hex_string(mcuPublicKey, sizeof(mcuPublicKey), mcuPublicKeyStr);
+  //conversion of mcu public key in string format
+		size_t inputLength = sizeof(mcuPublicKey) / sizeof(mcuPublicKey[0]);
+		char mcuPublicKeyStr[300]; // Adjust the size as needed
+		convert_to_hex_string(mcuPublicKey, inputLength, mcuPublicKeyStr);
+
+		//appending mcuPublicKeyStr with escape characters
+		char mcuPublicKeyStrSend[300] = "\"";
+         int len = strlen(mcuPublicKeyStr);
+         memcpy(&mcuPublicKeyStrSend[1], mcuPublicKeyStr, len);
+         mcuPublicKeyStrSend[len + 1] = '\"';
+         mcuPublicKeyStrSend[len + 2] = '\0';
+		 //char mcuPublicKeyStr[sizeof(mcuPublicKey) * 2 + 1]; // double the size for two hexadecimal digits per byte + 1 for null terminator
+		 //convert_to_hex_string(mcuPublicKey, sizeof(mcuPublicKey), mcuPublicKeyStr);
 
 	 /*
 	  const char *hex="1ebde72699eb046423784bd9f329a59ab485555dd83d45c7dc0c51928d159ac7f21e21d6b598e1e1e1719943b793f7f76886fb78f87879c32b2bce64309237ff";
 	  uint8_t h[64];
 
 	  hexToUint8Array(hex, h, sizeof(h));
-*/
+	  */
 
 	wait_ms(1000);
 	HAL_GPIO_WritePin(WIFI_MODEM_RESET_PORT, WIFI_MODEM_RESET_PIN, GPIO_PIN_SET);
@@ -382,7 +415,8 @@ int main(void)
 					get_drone_status(&data);
 					get_drone_status_string(&data, data_string);
 					generate_sharedsecret(mcuPrivateKey, sizeof(mcuPrivateKey), (uint8_t *)private_key_str, sizeof(private_key_str),sharedSecret);
-					//convert_to_hex_string(sharedSecret, sizeof(sharedSecret), sharedSecretStr);
+					//send mcu public key
+					mqtt__publish(mcuPublicKeyStrSend, strlen(mcuPublicKeyStrSend));
 					// encrypt string
 					//encrypt_data(sharedSecret,Plaintext, sizeof(Plaintext), cipherText);
 					mqtt__publish(data_string, strlen(data_string));
